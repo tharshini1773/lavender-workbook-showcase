@@ -28,3 +28,8 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Portfolio architecture
+- Keep factual portfolio data in `src/lib/portfolio.ts` and reuse section components across home and dedicated content routes to prevent inconsistent facts.
+- Keep shared navigation and footer in the root shell and give every content route its own metadata so pages are independently shareable.
+- Serve the resume as a CDN-hosted PDF generated from supplied profile details only; update it when those details change.

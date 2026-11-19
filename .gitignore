@@ -23,6 +23,10 @@ dist-ssr
 # Firebase
 .firebase/
 
+# Agent skills and lockfiles
+.agents/
+skills-lock.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

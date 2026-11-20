@@ -5,15 +5,17 @@ export const profile = {
   location: "Thoothukudi, Tamil Nadu, India",
   college: "Hindusthan College of Engineering and Technology",
   collegeLocation: "Coimbatore",
+  github: "https://github.com/tharshini1773",
+  linkedin: "https://www.linkedin.com/in/tharshini-j-a0ab4741b",
   objective: "To develop strong technical skills, gain practical experience through internships and projects, and build a successful career as a software developer in the IT industry.",
 };
 export const skills = [
-  { name: "C", icon: "C", category: "Programming language" },
-  { name: "Java", icon: "java", category: "Programming language" },
-  { name: "Python", icon: "py", category: "Programming language" },
-  { name: "HTML", icon: "</>", category: "Web technology" },
-  { name: "CSS", icon: "#", category: "Web technology" },
-  { name: "JavaScript", icon: "JS", category: "Web technology" },
+  { name: "C", icon: "C", category: "Programming language", level: 80 },
+  { name: "Java", icon: "java", category: "Programming language", level: 85 },
+  { name: "Python", icon: "py", category: "Programming language", level: 85 },
+  { name: "HTML", icon: "</>", category: "Web technology", level: 90 },
+  { name: "CSS", icon: "#", category: "Web technology", level: 85 },
+  { name: "JavaScript", icon: "JS", category: "Web technology", level: 80 },
 ];
 export const interests = ["Programming and problem solving", "Web development", "Learning new technologies", "Building practical projects"];
 export const project = {

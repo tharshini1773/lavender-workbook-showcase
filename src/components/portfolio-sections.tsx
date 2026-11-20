@@ -17,12 +17,25 @@ export function AboutSection({ preview = false }: { preview?: boolean }) {
       <p>I am interested in programming, web development and learning new technologies. I enjoy solving problems and improving my technical knowledge through practical projects.</p>
       {!preview && <p>My goal is to become a skilled software developer, gain real-world experience and build a successful career in the IT industry.</p>}
     </div>{preview && <Link to="/about" className="text-link mt-6">More about me <ArrowUpRight size={16} /></Link>}</div>
-    <div className="md:pt-7"><div className="profile-detail"><GraduationCap /><div><div className="detail-label">Currently studying</div><p>BE · Computer Science and Engineering</p><p className="mt-1 text-xs text-muted-foreground">2nd Year · Hindusthan College of Engineering and Technology</p></div></div><div className="profile-detail"><MapPin /><div><div className="detail-label">Based in</div>{profile.location}</div></div><div className="profile-detail"><Code2 /><div><div className="detail-label">Working towards</div>A career in software development</div></div><p className="mt-6 font-display text-xl italic text-primary">Always learning. Always building.</p></div>
+    <div className="md:pt-7">
+      <div className="profile-detail"><GraduationCap /><div><div className="detail-label">Currently studying</div><p>BE · Computer Science and Engineering</p><p className="mt-1 text-xs text-muted-foreground">2nd Year · Hindusthan College of Engineering and Technology</p></div></div>
+      <div className="profile-detail"><MapPin /><div><div className="detail-label">Based in</div>{profile.location}</div></div>
+      <div className="profile-detail"><Code2 /><div><div className="detail-label">Working towards</div>A career in software development</div></div>
+      <div className="mt-6 flex flex-wrap gap-2.5">
+        <a href={profile.github} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-xs font-medium text-foreground transition-all hover:border-primary/50 hover:bg-primary/5 hover:text-primary">
+          <Github size={14} className="text-primary" /> GitHub Profile <ArrowUpRight size={12} className="text-muted-foreground" />
+        </a>
+        <a href={profile.linkedin} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3.5 py-1.5 text-xs font-medium text-foreground transition-all hover:border-primary/50 hover:bg-primary/5 hover:text-primary">
+          <Linkedin size={14} className="text-primary" /> LinkedIn Profile <ArrowUpRight size={12} className="text-muted-foreground" />
+        </a>
+      </div>
+      <p className="mt-6 font-display text-xl italic text-primary">Always learning. Always building.</p>
+    </div>
   </div>{!preview && <div className="page-width mt-14"><h3 className="font-display text-3xl">What interests me</h3><div className="mt-6 grid gap-5 sm:grid-cols-2">{interests.map((interest, i) => { const Icon = [Braces, Code2, Lightbulb, Leaf][i]; return <div key={interest} className="flex items-center gap-3 text-sm text-muted-foreground">{Icon && <Icon size={18} className="text-primary" />}{interest}</div>; })}</div></div>}</section>;
 }
 
 export function EducationSection() {
-  return <section className="section bg-card"><div className="page-width grid gap-12 md:grid-cols-[1fr_1.3fr]"><SectionHeading label="My education" title="Building a strong foundation." /><div className="education-line"><span className="text-xs font-medium text-primary">Currently studying · 2nd Year</span><h3 className="mt-4 font-display text-3xl">Bachelor of Engineering</h3><p className="mt-3 text-sm">Computer Science and Engineering</p><p className="mt-5 text-sm text-muted-foreground">{profile.college}</p><p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><MapPin size={14} /> Coimbatore, Tamil Nadu</p></div></div></section>;
+  return <section className="section bg-card"><div className="page-width grid gap-12 md:grid-cols-[1fr_1.3fr]"><SectionHeading label="My education" title="Building a strong foundation." /><div className="education-line education-card"><span className="text-xs font-medium text-primary">Currently studying · 2nd Year</span><h3 className="mt-4 font-display text-3xl">Bachelor of Engineering</h3><p className="mt-3 text-sm">Computer Science and Engineering</p><p className="mt-5 text-sm text-muted-foreground">{profile.college}</p><p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><MapPin size={14} /> Coimbatore, Tamil Nadu</p></div></div></section>;
 }
 
 export function SkillsSection() {
@@ -60,6 +73,17 @@ export function SkillsSection() {
               <span className="text-[10px] rounded-full bg-secondary px-2 py-0.5 text-primary opacity-0 group-hover:opacity-100 transition-opacity">Active</span>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">{skill.category}</p>
+            {skill.level && (
+              <div className="mt-3">
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-1">
+                  <span>Proficiency</span>
+                  <span className="font-mono text-primary font-medium">{skill.level}%</span>
+                </div>
+                <div className="skill-progress-track">
+                  <div className="skill-progress-bar" style={{ width: `${skill.level}%` }} />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       ))}
@@ -83,5 +107,5 @@ export function ContactSection({ preview = false }: { preview?: boolean }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  return <section className="section"><div className="page-width grid gap-12 md:grid-cols-[1fr_1fr]"><div><SectionHeading label="Get in touch" title="Let’s start a conversation." /><p className="section-copy mt-6 max-w-sm">I’m interested in internship opportunities, practical projects, and connecting with people who share a love for technology.</p><div className="mt-7 flex flex-wrap gap-3"><Button variant="portfolio" size="lg" asChild><a href={`mailto:${profile.email}`}><Mail />Email me <ArrowUpRight /></a></Button><Button variant="portfolioOutline" size="lg" type="button" onClick={handleCopy} className="cursor-pointer">{copied ? <><Check size={16} className="text-emerald-600" />Copied to clipboard!</> : <><Copy size={16} />Copy Email</>}</Button><Button variant="portfolioOutline" size="lg" asChild><a href={resume.url} download="Tharshini-J-Resume.pdf"><Download />Download Resume</a></Button></div></div><div className="md:pt-5"><button type="button" onClick={handleCopy} className="profile-detail w-full text-left cursor-pointer" title="Click to copy email address"><Mail /><div><div className="detail-label">Email (click to copy)</div><span className="break-all font-mono text-xs">{profile.email}</span>{copied && <span className="ml-2 text-[10px] text-emerald-600 font-medium">Copied!</span>}</div></button><a href="tel:+917550362608" className="profile-detail"><Phone /><div><div className="detail-label">Phone</div>{profile.phone}</div></a><div className="profile-detail"><MapPin /><div><div className="detail-label">Location</div>{profile.location}</div></div><div className="mt-6 flex gap-6 text-xs text-muted-foreground"><span className="flex items-center gap-2" title="LinkedIn profile not yet provided"><Linkedin size={16} />LinkedIn <span className="text-[10px]">Coming soon</span></span><span className="flex items-center gap-2" title="GitHub profile not yet provided"><Github size={16} />GitHub <span className="text-[10px]">Coming soon</span></span></div>{!preview && <p className="mt-6 text-xs text-muted-foreground">Thank you for taking a look at my work.</p>}</div></div></section>;
+  return <section className="section"><div className="page-width grid gap-12 md:grid-cols-[1fr_1fr]"><div><SectionHeading label="Get in touch" title="Let’s start a conversation." /><p className="section-copy mt-6 max-w-sm">I’m interested in internship opportunities, practical projects, and connecting with people who share a love for technology.</p><div className="mt-7 flex flex-wrap gap-3"><Button variant="portfolio" size="lg" asChild><a href={`mailto:${profile.email}`}><Mail />Email me <ArrowUpRight /></a></Button><Button variant="portfolioOutline" size="lg" type="button" onClick={handleCopy} className="cursor-pointer">{copied ? <><Check size={16} className="text-emerald-600" />Copied to clipboard!</> : <><Copy size={16} />Copy Email</>}</Button><Button variant="portfolioOutline" size="lg" asChild><a href={resume.url} download="Tharshini-J-Resume.pdf"><Download />Download Resume</a></Button></div></div><div className="md:pt-5"><button type="button" onClick={handleCopy} className="profile-detail w-full text-left cursor-pointer" title="Click to copy email address"><Mail /><div><div className="detail-label">Email (click to copy)</div><span className="break-all font-mono text-xs">{profile.email}</span>{copied && <span className="ml-2 text-[10px] text-emerald-600 font-medium">Copied!</span>}</div></button><a href="tel:+917550362608" className="profile-detail"><Phone /><div><div className="detail-label">Phone</div>{profile.phone}</div></a><div className="profile-detail"><MapPin /><div><div className="detail-label">Location</div>{profile.location}</div></div><div className="mt-6 flex flex-wrap gap-3 text-xs font-medium"><a href={profile.linkedin} target="_blank" rel="noreferrer" aria-label="Visit LinkedIn profile of Tharshini J" className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-foreground transition-all hover:border-primary/50 hover:bg-primary/5 hover:text-primary"><Linkedin size={16} className="text-primary" /><span>LinkedIn</span><ArrowUpRight size={13} className="text-muted-foreground" /></a><a href={profile.github} target="_blank" rel="noreferrer" aria-label="Visit GitHub profile of Tharshini J" className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-foreground transition-all hover:border-primary/50 hover:bg-primary/5 hover:text-primary"><Github size={16} className="text-primary" /><span>GitHub</span><ArrowUpRight size={13} className="text-muted-foreground" /></a></div>{!preview && <p className="mt-6 text-xs text-muted-foreground">Thank you for taking a look at my work.</p>}</div></div></section>;
 }

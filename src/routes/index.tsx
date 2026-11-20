@@ -10,7 +10,8 @@ import {
   Sparkles, 
   Code2, 
   GraduationCap, 
-  ExternalLink 
+  ExternalLink,
+  Download
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -25,6 +26,7 @@ import { CertificatesSection } from "@/components/certificates-section";
 import { pageHead, profile } from "@/lib/portfolio";
 import { InteractiveParticles } from "@/components/effects";
 import workspace from "@/assets/workspace.png";
+import resume from "@/assets/tharshini-resume.pdf.asset.json";
 
 export const Route = createFileRoute("/")({
   head: () => pageHead("Computer Science Student & Aspiring Developer", "Hi, I’m Tharshini J, a Computer Science Engineering student. Explore my skills, education, Sweet Crumbs project and career goals."),
@@ -33,9 +35,9 @@ export const Route = createFileRoute("/")({
 
 function TypewriterRole() {
   const roles = [
-    "Computer Science Engineering Student",
+    "Computer Science Student",
     "Aspiring Software Developer",
-    "Passionate Problem Solver",
+    "Web Development Enthusiast",
   ];
   const [roleIndex, setRoleIndex] = useState(0);
   const [displayText, setDisplayText] = useState("");
@@ -125,7 +127,7 @@ function Index() {
             </p>
 
             {/* Glowing CTA Buttons */}
-            <div className="mt-8 flex flex-wrap items-center gap-4">
+            <div className="mt-8 flex flex-wrap items-center gap-3.5">
               <Button 
                 variant="portfolio" 
                 size="lg" 
@@ -133,7 +135,7 @@ function Index() {
                 asChild
               >
                 <Link to="/projects">
-                  Explore My Work <ArrowRight size={16} />
+                  View Projects <ArrowRight size={16} />
                 </Link>
               </Button>
 
@@ -146,6 +148,17 @@ function Index() {
                 <Link to="/contact">
                   Contact Me <ArrowUpRight size={16} />
                 </Link>
+              </Button>
+
+              <Button 
+                variant="portfolioOutline" 
+                size="lg" 
+                className="glass-panel gap-2 font-medium hover:bg-secondary/70 transition-all hover:scale-105"
+                asChild
+              >
+                <a href={resume.url} download="Tharshini-J-Resume.pdf">
+                  <Download size={16} /> Resume
+                </a>
               </Button>
 
               <div className="flex items-center gap-2.5 sm:ml-2">

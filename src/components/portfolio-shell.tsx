@@ -122,13 +122,19 @@ export function PortfolioFooter() {
   );
 }
 
-export function PageIntro({ label, title }: { label: string; title: string }) {
+export function PageIntro({ label, title, subtitle }: { label: string; title: string; subtitle?: string }) {
   return (
     <div className="page-intro-banner fade-in relative overflow-hidden">
       <div className="aurora-orb-1" />
+      <div className="aurora-orb-2 opacity-40" />
       <div className="page-width relative z-10">
         <div className="eyebrow">{label}</div>
-        <h1 className="text-gradient-purple">{title}</h1>
+        <h1 className="text-gradient-purple mt-2">{title}</h1>
+        {subtitle && (
+          <p className="mt-2.5 max-w-2xl text-sm font-medium text-muted-foreground leading-relaxed">
+            {subtitle}
+          </p>
+        )}
       </div>
     </div>
   );

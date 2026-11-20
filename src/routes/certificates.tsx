@@ -11,7 +11,11 @@ export const Route = createFileRoute("/certificates")({
 function CertificatesPage() {
   return (
     <>
-      <PageIntro label="Recognitions & Learning" title="My Certificates." />
+      <PageIntro 
+        label="Recognitions & Learning" 
+        title="My Certificates." 
+        subtitle="Verified credentials, course completions, and technical milestones stored and retrieved securely with Cloud Firestore."
+      />
       <CertificatesSection hideHeading />
     </>
   );

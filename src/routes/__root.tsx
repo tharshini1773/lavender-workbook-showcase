@@ -13,6 +13,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { PortfolioHeader, PortfolioFooter } from "@/components/portfolio-shell";
+import { InteractiveParticles } from "@/components/effects";
 
 function NotFoundComponent() {
   return (
@@ -126,10 +127,18 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <PortfolioHeader />
-      <main><Outlet /></main>
-      <PortfolioFooter />
+      {/* Global ambient lavender & violet atmosphere matching the hero theme across all pages */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
+        <div className="aurora-orb-1 opacity-70" />
+        <div className="aurora-orb-2 opacity-60" />
+        <div className="aurora-orb-3 opacity-55" />
+        <InteractiveParticles />
+      </div>
+      <div className="relative z-10 flex min-h-screen flex-col">
+        <PortfolioHeader />
+        <main className="flex-1"><Outlet /></main>
+        <PortfolioFooter />
+      </div>
     </QueryClientProvider>
   );
 }

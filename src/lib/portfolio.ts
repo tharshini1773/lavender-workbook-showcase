@@ -3,7 +3,7 @@ export const profile = {
   role: "Computer Science Engineering Student",
   focus: "Web Development & Software Development",
   headline: "Computer Science Student | Aspiring Software Developer | Web Development Enthusiast",
-  email: "tharshnitharshni28@gmail.com",
+  email: "tharshini1773@gmail.com",
   phone: "+91 7550362608",
   location: "Thoothukudi, Tamil Nadu, India",
   college: "Hindusthan College of Engineering and Technology",

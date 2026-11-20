@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { profile, project, skills } from "@/lib/portfolio";
 describe("Authentic portfolio details", () => {
   it("keeps the supplied contact details", () => {
-    expect(profile.email).toBe("tharshnitharshni28@gmail.com");
+    expect(profile.email).toBe("tharshini1773@gmail.com");
     expect(profile.phone).toBe("+91 7550362608");
   });
   it("lists only the supplied skills without proficiency percentages", () => {

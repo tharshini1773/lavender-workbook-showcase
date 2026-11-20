@@ -129,7 +129,8 @@ export function CertificatesSection({
     setResetLoading(true);
     setLoginError(null);
     setResetSentMessage(null);
-    const result = await sendAdminPasswordReset();
+    const target = loginEmail.trim() || ADMIN_EMAIL;
+    const result = await sendAdminPasswordReset(target);
     setResetLoading(false);
     if (result.success) {
       setResetSentMessage(result.message);
@@ -631,13 +632,13 @@ export function CertificatesSection({
                   <input
                     type="email"
                     required
-                    readOnly
-                    value={ADMIN_EMAIL}
-                    className="w-full rounded-lg border border-border bg-secondary/50 px-3 py-2 text-xs text-foreground cursor-not-allowed font-mono"
-                    title="Fixed authorized admin account"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground font-mono focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    placeholder={ADMIN_EMAIL}
                   />
                   <span className="text-[10px] text-muted-foreground mt-0.5 block">
-                    Fixed single-admin identity
+                    Authorized admin: {ADMIN_EMAIL}
                   </span>
                 </div>
 

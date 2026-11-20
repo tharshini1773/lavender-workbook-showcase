@@ -1,12 +1,18 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { 
-  getAuth, 
-  signInWithEmailAndPassword, 
-  signOut, 
-  onAuthStateChanged, 
-  sendPasswordResetEmail,
-  User 
-} from "firebase/auth";
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  User
+import {
+    getAuth,
+    signInWithEmailAndPassword,
+    signOut,
+    onAuthStateChanged,
+    sendPasswordResetEmail,
+    User
+  } from "firebase/auth";
 import {
   getFirestore,
   collection,
@@ -39,7 +45,8 @@ export const firebaseConfig = {
 };
 
 // Single authorized administrator email for Tharshini Portfolio
-export const ADMIN_EMAIL = "tharshnitharshni28@gmail.com";
+export const ADMIN_EMAIL = "tharshini1773@gmail.com";
+export const ALLOWED_ADMIN_EMAILS = ["tharshini1773@gmail.com", "tharshnitharshni28@gmail.com"];
 
 // Safe client-side initialization for SSR & browser
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
@@ -71,19 +78,19 @@ export interface ContactMessage {
 }
 
 /**
- * Checks if a user is the single authorized administrator
+ * Checks if a user is an authorized administrator
  */
 export function isAuthorizedAdmin(user: User | null): boolean {
   if (!user || !user.email) return false;
-  return user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  return ALLOWED_ADMIN_EMAILS.includes(user.email.toLowerCase());
 }
 
 /**
- * Secure login exclusively for the single authorized admin account
+ * Secure login exclusively for the authorized admin account
  */
 export async function loginAdmin(email: string, password: string): Promise<User> {
   const normalizedEmail = email.trim().toLowerCase();
-  if (normalizedEmail !== ADMIN_EMAIL.toLowerCase()) {
+  if (!ALLOWED_ADMIN_EMAILS.includes(normalizedEmail)) {
     throw new Error(`Access Denied: Only the authorized administrator account (${ADMIN_EMAIL}) is permitted to log in.`);
   }
 
@@ -101,12 +108,12 @@ export async function loginAdmin(email: string, password: string): Promise<User>
 /**
  * Send password reset email directly to the authorized admin email address
  */
-export async function sendAdminPasswordReset(): Promise<{ success: boolean; message: string }> {
+export async function sendAdminPasswordReset(targetEmail = ADMIN_EMAIL): Promise<{ success: boolean; message: string }> {
   try {
-    await sendPasswordResetEmail(auth, ADMIN_EMAIL);
+    await sendPasswordResetEmail(auth, targetEmail);
     return {
       success: true,
-      message: `Password reset instructions sent to ${ADMIN_EMAIL}. Please check your inbox or spam folder.`
+      message: `Password reset instructions sent to ${targetEmail}. Please check your inbox or spam folder.`
     };
   } catch (err: any) {
     return {
@@ -119,11 +126,13 @@ export async function sendAdminPasswordReset(): Promise<{ success: boolean; mess
 /**
  * Fetch certificates from Firestore.
  * By default returns published certificates for public view.
+ * If includeUnpublished is true, returns all (for authenticated admin).
  * If includeUnpublished is true AND caller is authorized admin, returns all certificates.
  */
 export async function getCertificates(includeUnpublished = false): Promise<Certificate[]> {
   try {
     const certsRef = collection(db, "certificates");
+    const q = includeUnpublished
     const adminActive = isAuthorizedAdmin(auth.currentUser);
     const shouldIncludeAll = includeUnpublished && adminActive;
 
@@ -152,32 +161,35 @@ export async function getCertificates(includeUnpublished = false): Promise<Certi
       });
     });
 
+    // If query was sorted without compound index, ensure descending date order
     return list.sort((a, b) => (b.issueDate > a.issueDate ? 1 : -1));
   } catch (err) {
     console.warn("Could not query Firestore certificates (fallback query):", err);
     try {
+      // Fallback query without filter if index is building
       const snapshot = await getDocs(collection(db, "certificates"));
       const fallbackList: Certificate[] = [];
       const adminActive = isAuthorizedAdmin(auth.currentUser);
       snapshot.forEach(docSnap => {
         const data = docSnap.data() as any;
-        if ((includeUnpublished && adminActive) || data.published !== false) {
-          const fileURL = data.fileURL || data.fileUrl || "";
-          fallbackList.push({
-            id: docSnap.id,
-            title: data.title || "",
-            issuer: data.issuer || "",
-            issueDate: data.issueDate || "",
-            description: data.description || "",
-            fileURL,
-            fileUrl: fileURL,
-            fileType: data.fileType || "image",
-            storagePath: data.storagePath || "",
-            published: data.published !== false,
-            createdAt: data.createdAt,
-          });
-        }
-      });
+        if (includeUnpublished || data.published !== false) {
+          if ((includeUnpublished && adminActive) || data.published !== false) {
+            const fileURL = data.fileURL || data.fileUrl || "";
+            fallbackList.push({
+              id: docSnap.id,
+              title: data.title || "",
+              issuer: data.issuer || "",
+              issueDate: data.issueDate || "",
+              description: data.description || "",
+              fileURL,
+              fileUrl: fileURL,
+              fileType: data.fileType || "image",
+              storagePath: data.storagePath || "",
+              published: data.published !== false,
+              createdAt: data.createdAt,
+            });
+          }
+        });
       return fallbackList.sort((a, b) => (b.issueDate > a.issueDate ? 1 : -1));
     } catch {
       return [];
@@ -187,6 +199,7 @@ export async function getCertificates(includeUnpublished = false): Promise<Certi
 
 /**
  * Upload certificate file to Firebase Storage and metadata to Firestore.
+ * Supports PDF, JPG, JPEG, PNG with file size and type validation.
  * RESTRICTED: Executable only by the authenticated single administrator.
  */
 export async function addCertificate(
@@ -241,6 +254,7 @@ export async function addCertificate(
     downloadUrl = await getDownloadURL(storageRef);
   } catch (storageErr) {
     console.info("Storage bucket pending initialization, using embedded fallback:", storageErr);
+    // Reliable Base64 conversion so uploads never fail
     // Reliable Base64 conversion fallback
     downloadUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -257,6 +271,7 @@ export async function addCertificate(
     issueDate: meta.issueDate,
     description: meta.description || "",
     fileURL: downloadUrl,
+    fileUrl: downloadUrl, // dual compatibility
     fileUrl: downloadUrl,
     fileType,
     storagePath,
@@ -269,6 +284,7 @@ export async function addCertificate(
 }
 
 /**
+ * Update certificate metadata in Firestore
  * Update certificate metadata in Firestore.
  * RESTRICTED: Executable only by the authenticated single administrator.
  */
@@ -285,6 +301,7 @@ export async function updateCertificate(
 }
 
 /**
+ * Delete certificate from Firestore and Firebase Storage
  * Delete certificate from Firestore and Firebase Storage.
  * RESTRICTED: Executable only by the authenticated single administrator.
  */
@@ -326,5 +343,6 @@ export async function sendContactMessage(data: ContactMessage): Promise<{ succes
   }
 }
 
+export { signInWithEmailAndPassword, signOut, onAuthStateChanged };
 export { signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail };
 export type { User };

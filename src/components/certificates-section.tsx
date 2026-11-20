@@ -27,6 +27,7 @@ import {
   updateCertificate, 
   deleteCertificate 
 } from "@/lib/firebase";
+import { TiltCard } from "@/components/effects";
 
 export function CertificatesSection({ 
   preview = false, 
@@ -214,107 +215,106 @@ export function CertificatesSection({
         ) : (
           <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {displayedCerts.map((cert) => (
-              <div 
-                key={cert.id} 
-                className="group relative flex flex-col justify-between rounded-2xl border border-border bg-card p-6 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-lg"
-              >
-                <div>
-                  {/* Top Badge & Management */}
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-[11px] font-medium text-primary">
-                      {cert.fileType === "pdf" ? <FileText size={13} /> : <ImageIcon size={13} />}
-                      {cert.fileType.toUpperCase()}
-                    </span>
-
-                    <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={() => openEditModal(cert)}
-                        className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-primary transition-all cursor-pointer"
-                        title="Edit certificate details"
-                      >
-                        <Edit3 size={14} />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(cert)}
-                        className="rounded-full p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all cursor-pointer"
-                        title="Delete certificate"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Thumbnail / Preview Box */}
-                  <div 
-                    onClick={() => setPreviewCert(cert)}
-                    className="mt-4 flex h-40 w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-border bg-secondary/40 transition-colors group-hover:bg-secondary/70 relative"
-                    title="Click to preview certificate"
-                  >
-                    {cert.fileType === "image" ? (
-                      <img 
-                        src={cert.fileUrl} 
-                        alt={cert.title} 
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        loading="lazy" 
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center gap-2 text-muted-foreground group-hover:text-primary transition-colors">
-                        <Award size={38} className="text-primary" />
-                        <span className="text-[11px] font-medium">Click to Preview PDF</span>
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span className="rounded-full bg-card/95 px-3 py-1 text-[11px] font-medium text-primary shadow-xs flex items-center gap-1.5">
-                        <Eye size={13} /> Click to View
+              <TiltCard key={cert.id} className="rounded-2xl">
+                <div className="group relative flex flex-col justify-between rounded-2xl border border-border bg-card p-6 shadow-xs transition-all duration-300 hover:border-primary/50 hover:shadow-lg h-full">
+                  <div>
+                    {/* Top Badge & Management */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-[11px] font-medium text-primary">
+                        {cert.fileType === "pdf" ? <FileText size={13} /> : <ImageIcon size={13} />}
+                        {cert.fileType.toUpperCase()}
                       </span>
+
+                      <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => openEditModal(cert)}
+                          className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-primary transition-all cursor-pointer"
+                          title="Edit certificate details"
+                        >
+                          <Edit3 size={14} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(cert)}
+                          className="rounded-full p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all cursor-pointer"
+                          title="Delete certificate"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
+
+                    {/* Thumbnail / Preview Box */}
+                    <div 
+                      onClick={() => setPreviewCert(cert)}
+                      className="mt-4 flex h-40 w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-border bg-secondary/40 transition-colors group-hover:bg-secondary/70 relative"
+                      title="Click to preview certificate"
+                    >
+                      {cert.fileType === "image" ? (
+                        <img 
+                          src={cert.fileUrl} 
+                          alt={cert.title} 
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          loading="lazy" 
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground group-hover:text-primary transition-colors">
+                          <Award size={38} className="text-primary" />
+                          <span className="text-[11px] font-medium">Click to Preview PDF</span>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="rounded-full bg-card/95 px-3 py-1 text-[11px] font-medium text-primary shadow-xs flex items-center gap-1.5">
+                          <Eye size={13} /> Click to View
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Metadata */}
+                    <h3 className="mt-4 font-display text-xl font-medium leading-snug group-hover:text-primary transition-colors">
+                      {cert.title}
+                    </h3>
+
+                    <div className="mt-2.5 space-y-1.5 text-xs text-muted-foreground">
+                      <p className="flex items-center gap-2">
+                        <Building2 size={13} className="text-primary" />
+                        <span>{cert.issuer}</span>
+                      </p>
+                      <p className="flex items-center gap-2">
+                        <Calendar size={13} className="text-primary" />
+                        <span>{cert.issueDate}</span>
+                      </p>
+                    </div>
+
+                    {cert.description && (
+                      <p className="mt-3 text-xs text-muted-foreground/90 line-clamp-2">
+                        {cert.description}
+                      </p>
+                    )}
                   </div>
 
-                  {/* Metadata */}
-                  <h3 className="mt-4 font-display text-xl font-medium leading-snug group-hover:text-primary transition-colors">
-                    {cert.title}
-                  </h3>
-
-                  <div className="mt-2.5 space-y-1.5 text-xs text-muted-foreground">
-                    <p className="flex items-center gap-2">
-                      <Building2 size={13} className="text-primary" />
-                      <span>{cert.issuer}</span>
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <Calendar size={13} className="text-primary" />
-                      <span>{cert.issueDate}</span>
-                    </p>
+                  {/* Bottom Actions for public */}
+                  <div className="mt-6 flex items-center gap-2 pt-4 border-t border-border">
+                    <Button 
+                      variant="portfolio" 
+                      size="sm" 
+                      className="flex-1 text-xs gap-1.5 cursor-pointer neon-glow-btn"
+                      onClick={() => setPreviewCert(cert)}
+                    >
+                      <Eye size={13} /> View Certificate
+                    </Button>
+                    <Button 
+                      variant="portfolioOutline" 
+                      size="sm" 
+                      asChild 
+                      className="text-xs gap-1.5 cursor-pointer"
+                    >
+                      <a href={cert.fileUrl} target="_blank" rel="noreferrer" download={`${cert.title}.${cert.fileType}`}>
+                        <Download size={13} /> Download
+                      </a>
+                    </Button>
                   </div>
-
-                  {cert.description && (
-                    <p className="mt-3 text-xs text-muted-foreground/90 line-clamp-2">
-                      {cert.description}
-                    </p>
-                  )}
                 </div>
-
-                {/* Bottom Actions for public */}
-                <div className="mt-6 flex items-center gap-2 pt-4 border-t border-border">
-                  <Button 
-                    variant="portfolio" 
-                    size="sm" 
-                    className="flex-1 text-xs gap-1.5 cursor-pointer"
-                    onClick={() => setPreviewCert(cert)}
-                  >
-                    <Eye size={13} /> View Certificate
-                  </Button>
-                  <Button 
-                    variant="portfolioOutline" 
-                    size="sm" 
-                    asChild 
-                    className="text-xs gap-1.5 cursor-pointer"
-                  >
-                    <a href={cert.fileUrl} target="_blank" rel="noreferrer" download={`${cert.title}.${cert.fileType}`}>
-                      <Download size={13} /> Download
-                    </a>
-                  </Button>
-                </div>
-              </div>
+              </TiltCard>
             ))}
           </div>
         )}

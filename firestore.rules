@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Public visitors can only read published certificates
+    // Authenticated admin can read, write, update, delete any certificates
+    match /certificates/{certificateId} {
+      allow read: if resource.data.published == true || request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // Public visitors can send contact messages
+    match /messages/{messageId} {
+      allow create: if true;
+      allow read, write: if request.auth != null;
+    }
+  }
+}

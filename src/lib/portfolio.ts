@@ -31,6 +31,7 @@ export const navigation = [
   { label: "Education", to: "/education" },
   { label: "Skills", to: "/skills" },
   { label: "Projects", to: "/projects" },
+  { label: "Certificates", to: "/certificates" },
   { label: "Career Objective", to: "/career-objective" },
   { label: "Contact", to: "/contact" },
 ] as const;

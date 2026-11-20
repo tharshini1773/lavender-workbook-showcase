@@ -12,7 +12,7 @@ function CertificatesPage() {
   return (
     <>
       <PageIntro label="Recognitions & Learning" title="My Certificates." />
-      <CertificatesSection />
+      <CertificatesSection hideHeading />
     </>
   );
 }

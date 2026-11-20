@@ -2,7 +2,10 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     match /certificates/{allPaths=**} {
-      allow read, write: if true;
+      // Public visitors can view and download certificate files
+      allow read: if true;
+      // Only authenticated admin can upload, overwrite, or delete
+      allow write: if request.auth != null;
     }
   }
 }

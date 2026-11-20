@@ -347,7 +347,7 @@ export function CareerSection() {
 
 export function ContactSection({ preview = false }: { preview?: boolean }) {
   const [copied, setCopied] = useState(false);
-  const [formState, setFormState] = useState({ name: "", email: "", message: "" });
+  const [formState, setFormState] = useState({ name: "", email: "", subject: "", message: "" });
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
 
@@ -364,7 +364,7 @@ export function ContactSection({ preview = false }: { preview?: boolean }) {
     const result = await sendContactMessage(formState);
     setSubmitting(false);
     setSubmitSuccess(result.message);
-    setFormState({ name: "", email: "", message: "" });
+    setFormState({ name: "", email: "", subject: "", message: "" });
     setTimeout(() => setSubmitSuccess(null), 5000);
   };
 
@@ -391,7 +391,7 @@ export function ContactSection({ preview = false }: { preview?: boolean }) {
           </div>
 
           <div className="mt-8 pt-6 border-t border-border max-w-sm">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Direct Message Form</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Send a Message (Firestore)</h4>
             {submitSuccess ? (
               <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-4 text-xs font-medium text-emerald-600 flex items-center gap-2">
                 <Check size={16} /> {submitSuccess}
@@ -414,16 +414,23 @@ export function ContactSection({ preview = false }: { preview?: boolean }) {
                   placeholder="Your Email"
                   className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
+                <input
+                  type="text"
+                  value={formState.subject}
+                  onChange={e => setFormState(prev => ({ ...prev, subject: e.target.value }))}
+                  placeholder="Subject (e.g. Internship Opportunity / Software Project)"
+                  className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
                 <textarea
                   required
                   rows={2}
                   value={formState.message}
                   onChange={e => setFormState(prev => ({ ...prev, message: e.target.value }))}
-                  placeholder="Write a message..."
+                  placeholder="Write your message..."
                   className="w-full rounded-xl border border-border bg-background px-3.5 py-2 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
                 <Button type="submit" variant="portfolio" size="sm" disabled={submitting} className="w-full text-xs gap-1.5 cursor-pointer neon-glow-btn">
-                  <Send size={13} /> {submitting ? "Sending..." : "Send Message"}
+                  <Send size={13} /> {submitting ? "Sending to Firestore..." : "Send Message"}
                 </Button>
               </form>
             )}

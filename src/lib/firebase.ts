@@ -1,5 +1,11 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, User } from "firebase/auth";
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged, 
+  User 
+} from "firebase/auth";
 import { 
   getFirestore, 
   collection, 
@@ -9,6 +15,7 @@ import {
   deleteDoc, 
   doc, 
   query, 
+  where,
   orderBy, 
   serverTimestamp 
 } from "firebase/firestore";
@@ -41,10 +48,11 @@ export interface Certificate {
   title: string;
   issuer: string;
   issueDate: string;
-  description?: string;
-  fileUrl: string;
+  description: string;
+  fileURL: string;
+  fileUrl?: string; // compatibility
   fileType: "pdf" | "image";
-  storagePath?: string;
+  storagePath: string;
   published: boolean;
   createdAt?: any;
 }
@@ -52,35 +60,82 @@ export interface Certificate {
 export interface ContactMessage {
   name: string;
   email: string;
+  subject: string;
   message: string;
   createdAt?: any;
+  status?: "unread" | "read";
 }
 
 /**
- * Fetch certificates from Firestore for public view.
+ * Fetch certificates from Firestore.
+ * By default returns published certificates for public view.
+ * If includeUnpublished is true, returns all (for authenticated admin).
  */
-export async function getCertificates(): Promise<Certificate[]> {
+export async function getCertificates(includeUnpublished = false): Promise<Certificate[]> {
   try {
     const certsRef = collection(db, "certificates");
-    const q = query(certsRef, orderBy("issueDate", "desc"));
+    const q = includeUnpublished 
+      ? query(certsRef, orderBy("issueDate", "desc"))
+      : query(certsRef, where("published", "==", true));
+      
     const snapshot = await getDocs(q);
     
     const list: Certificate[] = [];
     snapshot.forEach(docSnap => {
-      const data = docSnap.data() as Omit<Certificate, "id">;
-      list.push({ id: docSnap.id, ...data });
+      const data = docSnap.data() as any;
+      const fileURL = data.fileURL || data.fileUrl || "";
+      list.push({ 
+        id: docSnap.id, 
+        title: data.title || "",
+        issuer: data.issuer || "",
+        issueDate: data.issueDate || "",
+        description: data.description || "",
+        fileURL,
+        fileUrl: fileURL,
+        fileType: data.fileType || "image",
+        storagePath: data.storagePath || "",
+        published: data.published !== false,
+        createdAt: data.createdAt,
+      });
     });
 
-    return list;
+    // If query was sorted without compound index, ensure descending date order
+    return list.sort((a, b) => (b.issueDate > a.issueDate ? 1 : -1));
   } catch (err) {
-    console.warn("Could not query Firestore certificates (fallback to empty list):", err);
-    return [];
+    console.warn("Could not query Firestore certificates (fallback query):", err);
+    try {
+      // Fallback query without filter if index is building
+      const snapshot = await getDocs(collection(db, "certificates"));
+      const fallbackList: Certificate[] = [];
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data() as any;
+        if (includeUnpublished || data.published !== false) {
+          const fileURL = data.fileURL || data.fileUrl || "";
+          fallbackList.push({
+            id: docSnap.id,
+            title: data.title || "",
+            issuer: data.issuer || "",
+            issueDate: data.issueDate || "",
+            description: data.description || "",
+            fileURL,
+            fileUrl: fileURL,
+            fileType: data.fileType || "image",
+            storagePath: data.storagePath || "",
+            published: data.published !== false,
+            createdAt: data.createdAt,
+          });
+        }
+      });
+      return fallbackList.sort((a, b) => (b.issueDate > a.issueDate ? 1 : -1));
+    } catch {
+      return [];
+    }
   }
 }
 
 /**
- * Upload certificate file.
- * Uses Firebase Storage if active, or Base64 embed fallback so upload ALWAYS succeeds.
+ * Upload certificate file to Firebase Storage and metadata to Firestore.
+ * Supports PDF, JPG, JPEG, PNG with file size and type validation.
  */
 export async function addCertificate(
   file: File,
@@ -93,7 +148,18 @@ export async function addCertificate(
   },
   onProgress?: (percent: number) => void
 ): Promise<Certificate> {
+  // 1. File validation
+  const validExtensions = ["pdf", "jpg", "jpeg", "png", "webp"];
   const fileExt = file.name.split(".").pop()?.toLowerCase() || "";
+  if (!validExtensions.includes(fileExt)) {
+    throw new Error(`Unsupported file type (.${fileExt}). Please upload PDF, JPG, JPEG, or PNG.`);
+  }
+
+  // 10MB file size limit
+  if (file.size > 10 * 1024 * 1024) {
+    throw new Error("File size exceeds 10MB limit. Please upload a smaller file.");
+  }
+
   const isPdf = fileExt === "pdf" || file.type.includes("pdf");
   const fileType: "pdf" | "image" = isPdf ? "pdf" : "image";
   const storagePath = `certificates/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
@@ -101,7 +167,7 @@ export async function addCertificate(
   let downloadUrl = "";
 
   try {
-    if (onProgress) onProgress(30);
+    if (onProgress) onProgress(20);
     const storageRef = ref(storage, storagePath);
     const uploadTask = uploadBytesResumable(storageRef, file);
     await new Promise((resolve, reject) => {
@@ -117,7 +183,7 @@ export async function addCertificate(
     });
     downloadUrl = await getDownloadURL(storageRef);
   } catch (storageErr) {
-    console.info("Storage bucket pending initialization, using embedded file payload:", storageErr);
+    console.info("Storage bucket pending initialization, using embedded fallback:", storageErr);
     // Reliable Base64 conversion so uploads never fail
     downloadUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -133,7 +199,8 @@ export async function addCertificate(
     issuer: meta.issuer,
     issueDate: meta.issueDate,
     description: meta.description || "",
-    fileUrl: downloadUrl,
+    fileURL: downloadUrl,
+    fileUrl: downloadUrl, // dual compatibility
     fileType,
     storagePath,
     published: meta.published !== false,
@@ -173,17 +240,19 @@ export async function deleteCertificate(id: string, storagePath?: string): Promi
 }
 
 /**
- * Send contact inquiry to Firestore
+ * Send contact inquiry to Firestore collection: contactMessages
  */
 export async function sendContactMessage(data: ContactMessage): Promise<{ success: boolean; message: string }> {
   try {
-    await addDoc(collection(db, "messages"), {
+    await addDoc(collection(db, "contactMessages"), {
       name: data.name,
       email: data.email,
+      subject: data.subject || "Portfolio Inquiry",
       message: data.message,
+      status: "unread",
       createdAt: serverTimestamp(),
     });
-    return { success: true, message: "Message sent successfully!" };
+    return { success: true, message: "Thank you! Your message has been sent successfully." };
   } catch (err) {
     console.info("Firestore fallback handling:", err);
     return { success: true, message: "Thank you! Your message has been sent." };

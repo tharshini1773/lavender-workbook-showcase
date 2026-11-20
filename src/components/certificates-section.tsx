@@ -17,7 +17,10 @@ import {
   Calendar, 
   Building2,
   ArrowUpRight,
-  Sparkles
+  Sparkles,
+  Lock,
+  Unlock,
+  ShieldCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -25,7 +28,12 @@ import {
   getCertificates, 
   addCertificate, 
   updateCertificate, 
-  deleteCertificate 
+  deleteCertificate,
+  auth,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  User
 } from "@/lib/firebase";
 import { TiltCard } from "@/components/effects";
 
@@ -38,33 +46,72 @@ export function CertificatesSection({
 }) {
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   
   // Modals & Panels
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [editingCert, setEditingCert] = useState<Certificate | null>(null);
   const [previewCert, setPreviewCert] = useState<Certificate | null>(null);
 
-  // Form state
+  // Admin Login state
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  // Upload/Edit Form state
   const [formTitle, setFormTitle] = useState("");
   const [formIssuer, setFormIssuer] = useState("");
   const [formDate, setFormDate] = useState("");
   const [formDesc, setFormDesc] = useState("");
+  const [formPublished, setFormPublished] = useState(true);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch Certificates
+  // Listen to Firebase Auth state
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch Certificates from Firestore
   const loadData = async () => {
     setLoading(true);
-    const data = await getCertificates();
+    const data = await getCertificates(!!currentUser);
     setCertificates(data);
     setLoading(false);
   };
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [currentUser]);
+
+  // Handle Admin Sign In via Firebase Auth
+  const handleAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    setLoginLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+      setShowAdminLogin(false);
+      setLoginEmail("");
+      setLoginPassword("");
+    } catch (err: any) {
+      setLoginError(err.message || "Authentication failed. Please check your credentials.");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  // Handle Admin Sign Out
+  const handleAdminSignOut = async () => {
+    await signOut(auth);
+  };
 
   // Open Upload Modal
   const openNewModal = () => {
@@ -73,6 +120,7 @@ export function CertificatesSection({
     setFormIssuer("");
     setFormDate(new Date().toISOString().slice(0, 10));
     setFormDesc("");
+    setFormPublished(true);
     setSelectedFile(null);
     setUploadProgress(null);
     setFormError(null);
@@ -86,18 +134,19 @@ export function CertificatesSection({
     setFormIssuer(cert.issuer);
     setFormDate(cert.issueDate);
     setFormDesc(cert.description || "");
+    setFormPublished(cert.published);
     setSelectedFile(null);
     setUploadProgress(null);
     setFormError(null);
     setShowUploadModal(true);
   };
 
-  // Save / Upload Certificate
+  // Save / Upload Certificate to Firestore & Storage
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
-    if (!formTitle || !formIssuer || !formDate) {
+    if (!formTitle.trim() || !formIssuer.trim() || !formDate) {
       setFormError("Please fill in Title, Issuer and Issue Date.");
       return;
     }
@@ -106,15 +155,16 @@ export function CertificatesSection({
 
     try {
       if (editingCert) {
-        // Updating existing certificate metadata
+        // Updating existing certificate in Firestore
         await updateCertificate(editingCert.id, {
-          title: formTitle,
-          issuer: formIssuer,
+          title: formTitle.trim(),
+          issuer: formIssuer.trim(),
           issueDate: formDate,
-          description: formDesc,
+          description: formDesc.trim(),
+          published: formPublished,
         });
       } else {
-        // Uploading new certificate
+        // Uploading new certificate to Firebase Storage & Firestore
         if (!selectedFile) {
           setFormError("Please select a certificate file (PDF, JPG, PNG).");
           setIsSubmitting(false);
@@ -124,10 +174,11 @@ export function CertificatesSection({
         await addCertificate(
           selectedFile,
           {
-            title: formTitle,
-            issuer: formIssuer,
+            title: formTitle.trim(),
+            issuer: formIssuer.trim(),
             issueDate: formDate,
-            description: formDesc,
+            description: formDesc.trim(),
+            published: formPublished,
           },
           (progress) => setUploadProgress(progress)
         );
@@ -143,7 +194,7 @@ export function CertificatesSection({
     }
   };
 
-  // Delete Certificate
+  // Delete Certificate from Firestore & Storage
   const handleDelete = async (cert: Certificate) => {
     if (!window.confirm(`Are you sure you want to delete "${cert.title}"?`)) return;
     try {
@@ -157,34 +208,72 @@ export function CertificatesSection({
   const displayedCerts = preview ? certificates.slice(0, 3) : certificates;
 
   return (
-    <section className="section bg-card">
-      <div className="page-width">
+    <section className="section bg-card relative overflow-hidden">
+      <div className="aurora-orb-2" />
+      <div className="page-width relative z-10">
         {/* Controls Bar */}
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           {!hideHeading ? (
             <div>
               <div className="eyebrow">Recognitions & Learning</div>
-              <h2 className="section-title">My Certificates.</h2>
+              <h2 className="section-title text-gradient-purple">My Certificates.</h2>
             </div>
           ) : (
             <div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground font-medium">
                 Verified certificates, technical courses, and academic achievements.
               </p>
             </div>
           )}
 
-          <div className="flex items-center gap-3">
-            <Button 
-              onClick={openNewModal}
-              variant="portfolio" 
-              size="default" 
-              className="cursor-pointer gap-2 shadow-xs transition-transform hover:-translate-y-0.5"
-            >
-              <Plus size={16} /> Upload Certificate
-            </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            {currentUser ? (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-600">
+                  <ShieldCheck size={14} /> Admin Active
+                </span>
+                <Button 
+                  onClick={openNewModal}
+                  variant="portfolio" 
+                  size="default" 
+                  className="cursor-pointer gap-2 neon-glow-btn"
+                >
+                  <Plus size={16} /> Upload Certificate
+                </Button>
+                <Button 
+                  onClick={handleAdminSignOut}
+                  variant="outline" 
+                  size="default" 
+                  className="cursor-pointer text-xs gap-1.5"
+                  title="Sign out from Admin Mode"
+                >
+                  <Unlock size={14} className="text-muted-foreground" /> Sign Out
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Button 
+                  onClick={openNewModal}
+                  variant="portfolio" 
+                  size="default" 
+                  className="cursor-pointer gap-2 neon-glow-btn"
+                >
+                  <Plus size={16} /> Upload Certificate
+                </Button>
+                <Button 
+                  onClick={() => setShowAdminLogin(true)}
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-xs text-muted-foreground hover:text-primary gap-1.5 cursor-pointer"
+                  title="Admin Authentication Portal"
+                >
+                  <Lock size={13} /> Admin
+                </Button>
+              </div>
+            )}
+
             {preview && (
-              <Button asChild variant="portfolioOutline" size="default">
+              <Button asChild variant="portfolioOutline" size="default" className="glass-panel">
                 <Link to="/certificates" className="gap-1.5">
                   View All Certificates <ArrowUpRight size={14} />
                 </Link>
@@ -197,18 +286,18 @@ export function CertificatesSection({
         {loading ? (
           <div className="mt-12 flex flex-col items-center justify-center py-16 text-muted-foreground">
             <Loader2 className="animate-spin text-primary" size={28} />
-            <p className="mt-3 text-xs">Loading certificates...</p>
+            <p className="mt-3 text-xs font-medium">Loading certificates from Firestore...</p>
           </div>
         ) : displayedCerts.length === 0 ? (
-          <div className="mt-10 rounded-2xl border border-dashed border-border bg-secondary/30 p-12 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <div className="mt-10 rounded-2xl border border-dashed border-border/80 bg-secondary/30 p-12 text-center backdrop-blur-sm">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/15 text-primary shadow-[0_0_20px_rgba(168,85,247,0.3)]">
               <Award size={28} />
             </div>
             <h3 className="mt-4 font-display text-2xl font-medium">No certificates uploaded yet</h3>
             <p className="mx-auto mt-2 max-w-md text-xs text-muted-foreground">
-              Click the "Upload Certificate" button above to add your first certificate (PDF or Image). Everyone visiting will be able to view and download it!
+              Click the "Upload Certificate" button above to add your verified technical certificates. Everyone visiting will be able to view and download them!
             </p>
-            <Button onClick={openNewModal} variant="portfolio" size="sm" className="mt-6 gap-2 cursor-pointer">
+            <Button onClick={openNewModal} variant="portfolio" size="sm" className="mt-6 gap-2 cursor-pointer neon-glow-btn">
               <Plus size={15} /> Upload First Certificate
             </Button>
           </div>
@@ -218,14 +307,21 @@ export function CertificatesSection({
               <TiltCard key={cert.id} className="rounded-2xl">
                 <div className="group relative flex flex-col justify-between rounded-2xl border border-border bg-card p-6 shadow-xs transition-all duration-300 hover:border-primary/50 hover:shadow-lg h-full">
                   <div>
-                    {/* Top Badge & Management */}
+                    {/* Top Badge & Management Controls */}
                     <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-[11px] font-medium text-primary">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-[11px] font-semibold text-primary">
                         {cert.fileType === "pdf" ? <FileText size={13} /> : <ImageIcon size={13} />}
                         {cert.fileType.toUpperCase()}
                       </span>
 
-                      <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1">
+                        {currentUser && (
+                          <span className={`text-[10px] rounded-full px-2 py-0.5 font-semibold ${
+                            cert.published ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'
+                          }`}>
+                            {cert.published ? 'Published' : 'Draft'}
+                          </span>
+                        )}
                         <button 
                           onClick={() => openEditModal(cert)}
                           className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-primary transition-all cursor-pointer"
@@ -251,7 +347,7 @@ export function CertificatesSection({
                     >
                       {cert.fileType === "image" ? (
                         <img 
-                          src={cert.fileUrl} 
+                          src={cert.fileURL || cert.fileUrl} 
                           alt={cert.title} 
                           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                           loading="lazy" 
@@ -263,7 +359,7 @@ export function CertificatesSection({
                         </div>
                       )}
                       <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span className="rounded-full bg-card/95 px-3 py-1 text-[11px] font-medium text-primary shadow-xs flex items-center gap-1.5">
+                        <span className="rounded-full bg-card/95 px-3 py-1 text-[11px] font-semibold text-primary shadow-xs flex items-center gap-1.5">
                           <Eye size={13} /> Click to View
                         </span>
                       </div>
@@ -277,7 +373,7 @@ export function CertificatesSection({
                     <div className="mt-2.5 space-y-1.5 text-xs text-muted-foreground">
                       <p className="flex items-center gap-2">
                         <Building2 size={13} className="text-primary" />
-                        <span>{cert.issuer}</span>
+                        <span className="font-medium text-foreground">{cert.issuer}</span>
                       </p>
                       <p className="flex items-center gap-2">
                         <Calendar size={13} className="text-primary" />
@@ -306,9 +402,14 @@ export function CertificatesSection({
                       variant="portfolioOutline" 
                       size="sm" 
                       asChild 
-                      className="text-xs gap-1.5 cursor-pointer"
+                      className="text-xs gap-1.5 cursor-pointer glass-panel"
                     >
-                      <a href={cert.fileUrl} target="_blank" rel="noreferrer" download={`${cert.title}.${cert.fileType}`}>
+                      <a 
+                        href={cert.fileURL || cert.fileUrl} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        download={`${cert.title}.${cert.fileType}`}
+                      >
                         <Download size={13} /> Download
                       </a>
                     </Button>
@@ -321,16 +422,16 @@ export function CertificatesSection({
 
         {/* Certificate Preview Modal */}
         {previewCert && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
             <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col rounded-2xl border border-border bg-card p-6 shadow-2xl">
               <div className="flex items-center justify-between border-b border-border pb-4">
                 <div>
                   <h3 className="font-display text-2xl font-medium">{previewCert.title}</h3>
-                  <p className="text-xs text-muted-foreground">Issued by {previewCert.issuer} · {previewCert.issueDate}</p>
+                  <p className="text-xs text-muted-foreground font-medium">Issued by {previewCert.issuer} · {previewCert.issueDate}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" asChild className="gap-1.5 text-xs">
-                    <a href={previewCert.fileUrl} target="_blank" rel="noreferrer">
+                    <a href={previewCert.fileURL || previewCert.fileUrl} target="_blank" rel="noreferrer">
                       <ExternalLink size={13} /> Open in New Tab
                     </a>
                   </Button>
@@ -342,10 +443,10 @@ export function CertificatesSection({
 
               <div className="mt-4 flex-1 overflow-auto rounded-xl border border-border bg-secondary/30 min-h-[350px] flex items-center justify-center p-2">
                 {previewCert.fileType === "image" ? (
-                  <img src={previewCert.fileUrl} alt={previewCert.title} className="max-h-[70vh] w-auto object-contain mx-auto rounded-lg shadow-sm" />
+                  <img src={previewCert.fileURL || previewCert.fileUrl} alt={previewCert.title} className="max-h-[70vh] w-auto object-contain mx-auto rounded-lg shadow-sm" />
                 ) : (
                   <iframe 
-                    src={previewCert.fileUrl} 
+                    src={previewCert.fileURL || previewCert.fileUrl} 
                     title={previewCert.title} 
                     className="h-[70vh] w-full rounded-xl"
                   />
@@ -355,9 +456,72 @@ export function CertificatesSection({
           </div>
         )}
 
+        {/* Admin Login Modal (Firebase Auth) */}
+        {showAdminLogin && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-7 shadow-2xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-primary font-semibold">
+                  <Lock size={18} />
+                  <span>Admin Authentication</span>
+                </div>
+                <button 
+                  onClick={() => setShowAdminLogin(false)} 
+                  className="text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <p className="mt-2 text-xs text-muted-foreground">
+                Sign in with your Firebase administrator account to manage certificates and view private contact messages.
+              </p>
+
+              {loginError && (
+                <div className="mt-4 rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive">
+                  {loginError}
+                </div>
+              )}
+
+              <form onSubmit={handleAdminLogin} className="mt-5 space-y-3.5">
+                <div>
+                  <label className="block text-xs font-medium mb-1">Admin Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder="admin@example.com"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+                <Button 
+                  type="submit" 
+                  disabled={loginLoading} 
+                  variant="portfolio" 
+                  className="w-full text-xs cursor-pointer mt-2 neon-glow-btn"
+                >
+                  {loginLoading ? <Loader2 size={14} className="animate-spin" /> : "Sign In to Admin Portal"}
+                </Button>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* Upload / Edit Modal */}
         {showUploadModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
             <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-7 shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-border pb-4">
                 <div className="flex items-center gap-2 font-display text-2xl font-medium">
@@ -381,7 +545,7 @@ export function CertificatesSection({
               <form onSubmit={handleFormSubmit} className="mt-5 space-y-4">
                 {!editingCert && (
                   <div>
-                    <label className="block text-xs font-medium mb-1.5">Certificate File (PDF, JPG, PNG)</label>
+                    <label className="block text-xs font-medium mb-1.5">Certificate File (PDF, JPG, PNG - Max 10MB)</label>
                     <input
                       type="file"
                       required
@@ -390,7 +554,9 @@ export function CertificatesSection({
                       className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                     {selectedFile && (
-                      <p className="mt-1 text-[11px] text-primary">Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)</p>
+                      <p className="mt-1 text-[11px] text-primary font-medium">
+                        Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                      </p>
                     )}
                   </div>
                 )}
@@ -442,10 +608,23 @@ export function CertificatesSection({
                   />
                 </div>
 
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="publishedCheck"
+                    checked={formPublished}
+                    onChange={(e) => setFormPublished(e.target.checked)}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  />
+                  <label htmlFor="publishedCheck" className="text-xs font-medium cursor-pointer">
+                    Publish certificate immediately for public visitors
+                  </label>
+                </div>
+
                 {uploadProgress !== null && (
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Uploading to Firebase...</span>
+                      <span>Uploading to Firebase Storage & Firestore...</span>
                       <span>{uploadProgress}%</span>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
@@ -469,7 +648,7 @@ export function CertificatesSection({
                     disabled={isSubmitting} 
                     variant="portfolio" 
                     size="sm" 
-                    className="cursor-pointer text-xs gap-1.5"
+                    className="cursor-pointer text-xs gap-1.5 neon-glow-btn"
                   >
                     {isSubmitting ? (
                       <><Loader2 size={14} className="animate-spin" /> Uploading...</>

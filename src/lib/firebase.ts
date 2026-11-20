@@ -1,18 +1,12 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import {
-  getAuth,
-  signInWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-  User
-import {
-    getAuth,
-    signInWithEmailAndPassword,
-    signOut,
-    onAuthStateChanged,
-    sendPasswordResetEmail,
-    User
-  } from "firebase/auth";
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged, 
+  sendPasswordResetEmail,
+  User 
+} from "firebase/auth";
 import {
   getFirestore,
   collection,
@@ -94,15 +88,25 @@ export async function loginAdmin(email: string, password: string): Promise<User>
     throw new Error(`Access Denied: Only the authorized administrator account (${ADMIN_EMAIL}) is permitted to log in.`);
   }
 
-  const credential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
-  const user = credential.user;
+  try {
+    const credential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
+    const user = credential.user;
 
-  if (!isAuthorizedAdmin(user)) {
-    await signOut(auth);
-    throw new Error(`Unauthorized Account: Access is strictly restricted to ${ADMIN_EMAIL}.`);
+    if (!isAuthorizedAdmin(user)) {
+      await signOut(auth);
+      throw new Error(`Unauthorized Account: Access is strictly restricted to ${ADMIN_EMAIL}.`);
+    }
+
+    return user;
+  } catch (err: any) {
+    if (err.code === "auth/configuration-not-found" || err.message?.includes("configuration-not-found")) {
+      throw new Error("Firebase Authentication is not yet enabled in your Firebase Console! Please open Tab 4 (Firebase Console), click 'Build' > 'Authentication' > 'Get started', and enable 'Email/Password'.");
+    }
+    if (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential" || err.code === "auth/wrong-password") {
+      throw new Error("User not created or invalid password in Firebase. In your Firebase Console (Tab 4) > Authentication > Users tab, click 'Add user' and enter tharshini1773@gmail.com with your password (tharshini2608).");
+    }
+    throw err;
   }
-
-  return user;
 }
 
 /**
@@ -132,7 +136,6 @@ export async function sendAdminPasswordReset(targetEmail = ADMIN_EMAIL): Promise
 export async function getCertificates(includeUnpublished = false): Promise<Certificate[]> {
   try {
     const certsRef = collection(db, "certificates");
-    const q = includeUnpublished
     const adminActive = isAuthorizedAdmin(auth.currentUser);
     const shouldIncludeAll = includeUnpublished && adminActive;
 
@@ -172,24 +175,23 @@ export async function getCertificates(includeUnpublished = false): Promise<Certi
       const adminActive = isAuthorizedAdmin(auth.currentUser);
       snapshot.forEach(docSnap => {
         const data = docSnap.data() as any;
-        if (includeUnpublished || data.published !== false) {
-          if ((includeUnpublished && adminActive) || data.published !== false) {
-            const fileURL = data.fileURL || data.fileUrl || "";
-            fallbackList.push({
-              id: docSnap.id,
-              title: data.title || "",
-              issuer: data.issuer || "",
-              issueDate: data.issueDate || "",
-              description: data.description || "",
-              fileURL,
-              fileUrl: fileURL,
-              fileType: data.fileType || "image",
-              storagePath: data.storagePath || "",
-              published: data.published !== false,
-              createdAt: data.createdAt,
-            });
-          }
-        });
+        if ((includeUnpublished && adminActive) || data.published !== false) {
+          const fileURL = data.fileURL || data.fileUrl || "";
+          fallbackList.push({
+            id: docSnap.id,
+            title: data.title || "",
+            issuer: data.issuer || "",
+            issueDate: data.issueDate || "",
+            description: data.description || "",
+            fileURL,
+            fileUrl: fileURL,
+            fileType: data.fileType || "image",
+            storagePath: data.storagePath || "",
+            published: data.published !== false,
+            createdAt: data.createdAt,
+          });
+        }
+      });
       return fallbackList.sort((a, b) => (b.issueDate > a.issueDate ? 1 : -1));
     } catch {
       return [];
@@ -343,6 +345,5 @@ export async function sendContactMessage(data: ContactMessage): Promise<{ succes
   }
 }
 
-export { signInWithEmailAndPassword, signOut, onAuthStateChanged };
 export { signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail };
 export type { User };

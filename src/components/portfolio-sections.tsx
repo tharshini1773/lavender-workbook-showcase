@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowUpRight, GraduationCap, MapPin, Mail, Phone, Download, Github, Linkedin, Plus, Code2, Coffee, Braces, Leaf, Lightbulb, ArrowRight } from "lucide-react";
+import { ArrowUpRight, GraduationCap, MapPin, Mail, Phone, Download, Github, Linkedin, Plus, Code2, Coffee, Braces, Leaf, Lightbulb, ArrowRight, Check, Copy, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { profile, project, skills, interests } from "@/lib/portfolio";
 import projectImage from "@/assets/sweet-crumbs.png";
@@ -25,17 +26,62 @@ export function EducationSection() {
 }
 
 export function SkillsSection() {
-  return <section className="section"><div className="page-width"><div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><SectionHeading label="Technical skills" title="My growing toolkit." /><p className="section-copy max-w-xs">Languages and technologies I’m learning<br className="hidden sm:block" /> and putting into practice.</p></div><div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{skills.map(skill => <div key={skill.name} className="skill-card"><span className="technology-icon" aria-hidden="true">{skill.name === "Java" ? <Coffee size={26} /> : skill.name === "Python" ? <Braces size={26} /> : skill.icon}</span><div><h3 className="text-base font-medium">{skill.name}</h3><p className="mt-1 text-xs text-muted-foreground">{skill.category}</p></div></div>)}</div></div></section>;
+  const [filter, setFilter] = useState<string>("All");
+  const filteredSkills = filter === "All"
+    ? skills
+    : filter === "Languages"
+    ? skills.filter(s => s.category.toLowerCase().includes("language"))
+    : skills.filter(s => s.category.toLowerCase().includes("web"));
+
+  return <section className="section"><div className="page-width">
+    <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+      <SectionHeading label="Technical skills" title="My growing toolkit." />
+      <div className="flex flex-wrap items-center gap-2">
+        {(["All", "Languages", "Web Technologies"] as const).map(cat => (
+          <button
+            key={cat}
+            type="button"
+            className="filter-btn"
+            data-active={filter === cat}
+            onClick={() => setFilter(cat)}
+          >
+            {cat} {cat === "All" ? `(${skills.length})` : cat === "Languages" ? "(3)" : "(3)"}
+          </button>
+        ))}
+      </div>
+    </div>
+    <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {filteredSkills.map(skill => (
+        <div key={skill.name} className="skill-card group">
+          <span className="technology-icon" aria-hidden="true">{skill.name === "Java" ? <Coffee size={24} /> : skill.name === "Python" ? <Braces size={24} /> : skill.icon}</span>
+          <div className="flex-1">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-medium group-hover:text-primary transition-colors">{skill.name}</h3>
+              <span className="text-[10px] rounded-full bg-secondary px-2 py-0.5 text-primary opacity-0 group-hover:opacity-100 transition-opacity">Active</span>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">{skill.category}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div></section>;
 }
 
 export function ProjectsSection({ preview = false }: { preview?: boolean }) {
-  return <section className="section bg-card"><div className="page-width"><div className="flex flex-wrap items-end justify-between gap-5"><SectionHeading label="Selected work" title="Ideas turned into projects." />{preview && <Link to="/projects" className="text-link">View my projects <ArrowUpRight size={16} /></Link>}</div><div className="mt-10 grid gap-6 md:grid-cols-2"><article className="project-card"><a href={project.url} target="_blank" rel="noreferrer" aria-label="Visit Sweet Crumbs website"><img className="project-image" src={projectImage} alt="Sweet Crumbs bakery website featuring a floral celebration cake" loading="lazy" /></a><div className="p-7"><div className="flex items-center justify-between gap-3"><span className="text-[10px] font-medium uppercase tracking-widest text-primary">01 / {project.label}</span><ArrowUpRight size={17} className="text-primary" /></div><h3 className="mt-4 font-display text-3xl">{project.title}</h3><p className="mt-1 text-xs text-muted-foreground">{project.subtitle}</p><p className="section-copy mt-4">My first web development project. A modern bakery website designed to showcase bakery products and make exploring and enquiring easy.</p>{!preview && <ul className="mt-5 space-y-2 text-xs text-muted-foreground">{project.features.map(feature => <li key={feature} className="flex items-center gap-2"><span className="h-1 w-1 rounded-full bg-primary" />{feature}</li>)}</ul>}<Button asChild variant="link" className="mt-4 h-auto p-0 text-xs"><a href={project.url} target="_blank" rel="noreferrer">Visit live website <ArrowUpRight /></a></Button></div></article><article className="project-card"><div className="project-placeholder"><Plus /><span className="font-display text-2xl text-muted-foreground">The next chapter</span></div><div className="p-7"><span className="text-[10px] uppercase tracking-widest text-muted-foreground">02 / Future project</span><h3 className="mt-4 font-display text-3xl">More to come.</h3><p className="section-copy mt-4">A space for the projects I’ll build as I continue learning and exploring.</p><span className="mt-5 inline-flex items-center gap-2 text-xs text-primary"><span className="h-1.5 w-1.5 rounded-full bg-primary" />Looking ahead</span></div></article></div></div></section>;
+  return <section className="section bg-card"><div className="page-width"><div className="flex flex-wrap items-end justify-between gap-5"><SectionHeading label="Selected work" title="Ideas turned into projects." />{preview && <Link to="/projects" className="text-link group">View my projects <ArrowUpRight size={16} className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" /></Link>}</div><div className="mt-10 grid gap-6 md:grid-cols-2"><article className="project-card group"><a href={project.url} target="_blank" rel="noreferrer" aria-label="Visit Sweet Crumbs website" className="block relative overflow-hidden"><img className="project-image" src={projectImage} alt="Sweet Crumbs bakery website featuring a floral celebration cake" loading="lazy" /><div className="absolute top-3 right-3 flex items-center gap-1.5 rounded-full bg-background/90 backdrop-blur-sm border border-border px-2.5 py-1 text-[10px] font-medium text-foreground shadow-sm"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />Live</div></a><div className="p-7"><div className="flex items-center justify-between gap-3"><span className="text-[10px] font-medium uppercase tracking-widest text-primary">01 / {project.label}</span><ArrowUpRight size={17} className="text-primary transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" /></div><h3 className="mt-4 font-display text-3xl group-hover:text-primary transition-colors">{project.title}</h3><p className="mt-1 text-xs text-muted-foreground">{project.subtitle}</p><p className="section-copy mt-4">My first web development project. A modern bakery website designed to showcase bakery products and make exploring and enquiring easy.</p>{!preview && <ul className="mt-5 space-y-2 text-xs text-muted-foreground">{project.features.map(feature => <li key={feature} className="flex items-center gap-2 hover:text-foreground transition-colors"><span className="h-1.5 w-1.5 rounded-full bg-primary" />{feature}</li>)}</ul>}<Button asChild variant="link" className="mt-4 h-auto p-0 text-xs font-medium"><a href={project.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">Visit live website <ArrowUpRight size={14} /></a></Button></div></article><article className="project-card"><div className="project-placeholder"><Plus /><span className="font-display text-2xl text-muted-foreground">The next chapter</span></div><div className="p-7"><span className="text-[10px] uppercase tracking-widest text-muted-foreground">02 / Future project</span><h3 className="mt-4 font-display text-3xl">More to come.</h3><p className="section-copy mt-4">A space for the projects I’ll build as I continue learning and exploring.</p><span className="mt-5 inline-flex items-center gap-2 text-xs text-primary"><span className="h-1.5 w-1.5 rounded-full bg-primary" />Looking ahead</span></div></article></div></div></section>;
 }
 
 export function CareerSection() {
-  return <section className="section border-y border-border bg-secondary/40"><div className="page-width grid gap-8 md:grid-cols-[1fr_1.3fr]"><SectionHeading label="Career objective" title="Learning today. Building tomorrow." /><div className="md:pt-8"><p className="font-display text-2xl leading-relaxed">{profile.objective}</p><div className="mt-7 flex items-center gap-3 text-xs text-primary"><ArrowRight size={17} />Aspiring Software Developer</div></div></div></section>;
+  return <section className="section border-y border-border bg-secondary/40"><div className="page-width grid gap-8 md:grid-cols-[1fr_1.3fr]"><SectionHeading label="Career objective" title="Learning today. Building tomorrow." /><div className="md:pt-8"><p className="font-display text-2xl leading-relaxed">{profile.objective}</p><div className="mt-7 flex items-center gap-3 text-xs text-primary font-medium"><ArrowRight size={17} className="transition-transform group-hover:translate-x-1" />Aspiring Software Developer</div></div></div></section>;
 }
 
 export function ContactSection({ preview = false }: { preview?: boolean }) {
-  return <section className="section"><div className="page-width grid gap-12 md:grid-cols-[1fr_1fr]"><div><SectionHeading label="Get in touch" title="Let’s start a conversation." /><p className="section-copy mt-6 max-w-sm">I’m interested in internship opportunities, practical projects, and connecting with people who share a love for technology.</p><div className="mt-7 flex flex-wrap gap-3"><Button variant="portfolio" size="lg" asChild><a href={`mailto:${profile.email}`}><Mail />Email me <ArrowUpRight /></a></Button><Button variant="portfolioOutline" size="lg" asChild><a href={resume.url} download="Tharshini-J-Resume.pdf"><Download />Download Resume</a></Button></div></div><div className="md:pt-5"><a href={`mailto:${profile.email}`} className="profile-detail"><Mail /><div><div className="detail-label">Email</div><span className="break-all">{profile.email}</span></div></a><a href="tel:+917550362608" className="profile-detail"><Phone /><div><div className="detail-label">Phone</div>{profile.phone}</div></a><div className="profile-detail"><MapPin /><div><div className="detail-label">Location</div>{profile.location}</div></div><div className="mt-6 flex gap-6 text-xs text-muted-foreground"><span className="flex items-center gap-2" title="LinkedIn profile not yet provided"><Linkedin size={16} />LinkedIn <span className="text-[10px]">Coming soon</span></span><span className="flex items-center gap-2" title="GitHub profile not yet provided"><Github size={16} />GitHub <span className="text-[10px]">Coming soon</span></span></div>{!preview && <p className="mt-6 text-xs text-muted-foreground">Thank you for taking a look at my work.</p>}</div></div></section>;
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(profile.email);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return <section className="section"><div className="page-width grid gap-12 md:grid-cols-[1fr_1fr]"><div><SectionHeading label="Get in touch" title="Let’s start a conversation." /><p className="section-copy mt-6 max-w-sm">I’m interested in internship opportunities, practical projects, and connecting with people who share a love for technology.</p><div className="mt-7 flex flex-wrap gap-3"><Button variant="portfolio" size="lg" asChild><a href={`mailto:${profile.email}`}><Mail />Email me <ArrowUpRight /></a></Button><Button variant="portfolioOutline" size="lg" type="button" onClick={handleCopy} className="cursor-pointer">{copied ? <><Check size={16} className="text-emerald-600" />Copied to clipboard!</> : <><Copy size={16} />Copy Email</>}</Button><Button variant="portfolioOutline" size="lg" asChild><a href={resume.url} download="Tharshini-J-Resume.pdf"><Download />Download Resume</a></Button></div></div><div className="md:pt-5"><button type="button" onClick={handleCopy} className="profile-detail w-full text-left cursor-pointer" title="Click to copy email address"><Mail /><div><div className="detail-label">Email (click to copy)</div><span className="break-all font-mono text-xs">{profile.email}</span>{copied && <span className="ml-2 text-[10px] text-emerald-600 font-medium">Copied!</span>}</div></button><a href="tel:+917550362608" className="profile-detail"><Phone /><div><div className="detail-label">Phone</div>{profile.phone}</div></a><div className="profile-detail"><MapPin /><div><div className="detail-label">Location</div>{profile.location}</div></div><div className="mt-6 flex gap-6 text-xs text-muted-foreground"><span className="flex items-center gap-2" title="LinkedIn profile not yet provided"><Linkedin size={16} />LinkedIn <span className="text-[10px]">Coming soon</span></span><span className="flex items-center gap-2" title="GitHub profile not yet provided"><Github size={16} />GitHub <span className="text-[10px]">Coming soon</span></span></div>{!preview && <p className="mt-6 text-xs text-muted-foreground">Thank you for taking a look at my work.</p>}</div></div></section>;
 }

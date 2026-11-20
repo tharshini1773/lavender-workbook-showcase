@@ -20,7 +20,12 @@ import {
   Sparkles,
   Lock,
   Unlock,
-  ShieldCheck
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle,
+  SlidersHorizontal,
+  KeyRound,
+  FileCheck2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -29,8 +34,11 @@ import {
   addCertificate, 
   updateCertificate, 
   deleteCertificate,
+  loginAdmin,
+  sendAdminPasswordReset,
+  isAuthorizedAdmin,
+  ADMIN_EMAIL,
   auth,
-  signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   User
@@ -47,18 +55,23 @@ export function CertificatesSection({
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const isAdmin = isAuthorizedAdmin(currentUser);
   
   // Modals & Panels
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showManageDrawer, setShowManageDrawer] = useState(false);
   const [editingCert, setEditingCert] = useState<Certificate | null>(null);
   const [previewCert, setPreviewCert] = useState<Certificate | null>(null);
+  const [deleteConfirmCert, setDeleteConfirmCert] = useState<Certificate | null>(null);
 
   // Admin Login state
-  const [loginEmail, setLoginEmail] = useState("");
+  const [loginEmail, setLoginEmail] = useState(ADMIN_EMAIL);
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginLoading, setLoginLoading] = useState(false);
+  const [resetSentMessage, setResetSentMessage] = useState<string | null>(null);
+  const [resetLoading, setResetLoading] = useState(false);
 
   // Upload/Edit Form state
   const [formTitle, setFormTitle] = useState("");
@@ -70,6 +83,7 @@ export function CertificatesSection({
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Listen to Firebase Auth state
   useEffect(() => {
@@ -82,39 +96,61 @@ export function CertificatesSection({
   // Fetch Certificates from Firestore
   const loadData = async () => {
     setLoading(true);
-    const data = await getCertificates(!!currentUser);
+    const data = await getCertificates(isAdmin);
     setCertificates(data);
     setLoading(false);
   };
 
   useEffect(() => {
     loadData();
-  }, [currentUser]);
+  }, [isAdmin]);
 
-  // Handle Admin Sign In via Firebase Auth
+  // Handle Admin Sign In (Strictly Single Admin)
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
+    setResetSentMessage(null);
     setLoginLoading(true);
+
     try {
-      await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+      await loginAdmin(loginEmail, loginPassword);
       setShowAdminLogin(false);
-      setLoginEmail("");
       setLoginPassword("");
+      await loadData();
     } catch (err: any) {
-      setLoginError(err.message || "Authentication failed. Please check your credentials.");
+      setLoginError(err.message || "Authentication failed. Please verify credentials.");
     } finally {
       setLoginLoading(false);
+    }
+  };
+
+  // Handle Password Reset / Setup Link
+  const handlePasswordReset = async () => {
+    setResetLoading(true);
+    setLoginError(null);
+    setResetSentMessage(null);
+    const result = await sendAdminPasswordReset();
+    setResetLoading(false);
+    if (result.success) {
+      setResetSentMessage(result.message);
+    } else {
+      setLoginError(result.message);
     }
   };
 
   // Handle Admin Sign Out
   const handleAdminSignOut = async () => {
     await signOut(auth);
+    setShowManageDrawer(false);
+    setShowUploadModal(false);
   };
 
   // Open Upload Modal
   const openNewModal = () => {
+    if (!isAdmin) {
+      setShowAdminLogin(true);
+      return;
+    }
     setEditingCert(null);
     setFormTitle("");
     setFormIssuer("");
@@ -129,6 +165,10 @@ export function CertificatesSection({
 
   // Open Edit Modal
   const openEditModal = (cert: Certificate) => {
+    if (!isAdmin) {
+      setShowAdminLogin(true);
+      return;
+    }
     setEditingCert(cert);
     setFormTitle(cert.title);
     setFormIssuer(cert.issuer);
@@ -141,13 +181,18 @@ export function CertificatesSection({
     setShowUploadModal(true);
   };
 
-  // Save / Upload Certificate to Firestore & Storage
+  // Save / Upload Certificate
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
+    if (!isAdmin) {
+      setFormError("Unauthorized: Only the authorized administrator can perform this action.");
+      return;
+    }
+
     if (!formTitle.trim() || !formIssuer.trim() || !formDate) {
-      setFormError("Please fill in Title, Issuer and Issue Date.");
+      setFormError("Please provide Title, Issuer, and Issue Date.");
       return;
     }
 
@@ -164,9 +209,9 @@ export function CertificatesSection({
           published: formPublished,
         });
       } else {
-        // Uploading new certificate to Firebase Storage & Firestore
+        // Uploading new certificate
         if (!selectedFile) {
-          setFormError("Please select a certificate file (PDF, JPG, PNG).");
+          setFormError("Please select a certificate file (PDF, JPG, or PNG).");
           setIsSubmitting(false);
           return;
         }
@@ -180,38 +225,57 @@ export function CertificatesSection({
             description: formDesc.trim(),
             published: formPublished,
           },
-          (progress) => setUploadProgress(progress)
+          (pct) => setUploadProgress(pct)
         );
       }
 
       setShowUploadModal(false);
+      setEditingCert(null);
       await loadData();
     } catch (err: any) {
-      setFormError(err.message || "Upload failed. Please try again.");
+      setFormError(err.message || "Failed to save certificate.");
     } finally {
       setIsSubmitting(false);
       setUploadProgress(null);
     }
   };
 
-  // Delete Certificate from Firestore & Storage
-  const handleDelete = async (cert: Certificate) => {
-    if (!window.confirm(`Are you sure you want to delete "${cert.title}"?`)) return;
+  // Toggle Published / Draft status (Admin only)
+  const handleTogglePublish = async (cert: Certificate) => {
+    if (!isAdmin) return;
     try {
-      await deleteCertificate(cert.id, cert.storagePath);
+      await updateCertificate(cert.id, { published: !cert.published });
+      await loadData();
+    } catch (err: any) {
+      alert("Failed to update status: " + err.message);
+    }
+  };
+
+  // Confirm and Execute Delete (Admin only)
+  const confirmDelete = async () => {
+    if (!deleteConfirmCert || !isAdmin) return;
+    setIsDeleting(true);
+    try {
+      await deleteCertificate(deleteConfirmCert.id, deleteConfirmCert.storagePath);
+      setDeleteConfirmCert(null);
       await loadData();
     } catch (err: any) {
       alert("Delete failed: " + err.message);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   const displayedCerts = preview ? certificates.slice(0, 3) : certificates;
+  const publishedCount = certificates.filter(c => c.published).length;
+  const draftCount = certificates.length - publishedCount;
 
   return (
     <section className="section bg-card relative overflow-hidden">
       <div className="aurora-orb-2" />
       <div className="page-width relative z-10">
-        {/* Controls Bar */}
+        
+        {/* Top Header & Public / Admin Controls */}
         <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
           {!hideHeading ? (
             <div>
@@ -221,85 +285,126 @@ export function CertificatesSection({
           ) : (
             <div>
               <p className="text-sm text-muted-foreground font-medium">
-                Verified certificates, technical courses, and academic achievements.
+                Verified technical certificates, completed courses, and academic recognitions.
               </p>
             </div>
           )}
 
           <div className="flex flex-wrap items-center gap-3">
-            {currentUser ? (
+            {isAdmin ? (
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-600">
-                  <ShieldCheck size={14} /> Admin Active
-                </span>
                 <Button 
                   onClick={openNewModal}
                   variant="portfolio" 
                   size="default" 
-                  className="cursor-pointer gap-2 neon-glow-btn"
+                  className="cursor-pointer gap-2 neon-glow-btn text-xs"
                 >
-                  <Plus size={16} /> Upload Certificate
+                  <Plus size={15} /> Upload Certificate
+                </Button>
+                <Button 
+                  onClick={() => setShowManageDrawer(!showManageDrawer)}
+                  variant="outline" 
+                  size="default" 
+                  className="cursor-pointer text-xs gap-1.5 glass-panel"
+                >
+                  <SlidersHorizontal size={14} className="text-primary" /> Manage ({certificates.length})
                 </Button>
                 <Button 
                   onClick={handleAdminSignOut}
-                  variant="outline" 
+                  variant="ghost" 
                   size="default" 
-                  className="cursor-pointer text-xs gap-1.5"
-                  title="Sign out from Admin Mode"
+                  className="cursor-pointer text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                  title="Sign out of Admin Portal"
                 >
-                  <Unlock size={14} className="text-muted-foreground" /> Sign Out
+                  <Unlock size={14} /> Logout
                 </Button>
               </div>
             ) : (
               <div className="flex items-center gap-2">
+                {preview && (
+                  <Button asChild variant="portfolioOutline" size="sm" className="glass-panel text-xs">
+                    <Link to="/certificates" className="gap-1.5">
+                      View All Certificates <ArrowUpRight size={13} />
+                    </Link>
+                  </Button>
+                )}
+                {/* Single Admin Portal Access Button */}
                 <Button 
-                  onClick={openNewModal}
-                  variant="portfolio" 
-                  size="default" 
-                  className="cursor-pointer gap-2 neon-glow-btn"
-                >
-                  <Plus size={16} /> Upload Certificate
-                </Button>
-                <Button 
-                  onClick={() => setShowAdminLogin(true)}
+                  onClick={() => {
+                    setLoginError(null);
+                    setResetSentMessage(null);
+                    setShowAdminLogin(true);
+                  }}
                   variant="ghost" 
                   size="sm" 
                   className="text-xs text-muted-foreground hover:text-primary gap-1.5 cursor-pointer"
-                  title="Admin Authentication Portal"
+                  title="Authorized Administrator Portal"
                 >
-                  <Lock size={13} /> Admin
+                  <Lock size={12} /> Admin Portal
                 </Button>
               </div>
-            )}
-
-            {preview && (
-              <Button asChild variant="portfolioOutline" size="default" className="glass-panel">
-                <Link to="/certificates" className="gap-1.5">
-                  View All Certificates <ArrowUpRight size={14} />
-                </Link>
-              </Button>
             )}
           </div>
         </div>
 
-        {/* Content Area */}
+        {/* Admin Dashboard Active Banner (Shown only to authenticated admin) */}
+        {isAdmin && (
+          <div className="mt-8 rounded-2xl border border-primary/25 bg-primary/8 p-4 backdrop-blur-md flex flex-wrap items-center justify-between gap-4 animate-in fade-in">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/20 text-primary">
+                <ShieldCheck size={20} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-foreground">Admin Portal Active</span>
+                  <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
+                    Single-Admin Authorized
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                  Logged in as: {ADMIN_EMAIL}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs">
+              <span className="px-3 py-1 rounded-lg bg-card/80 border border-border text-foreground font-medium">
+                Total: <strong className="text-primary">{certificates.length}</strong>
+              </span>
+              <span className="px-3 py-1 rounded-lg bg-card/80 border border-border text-foreground font-medium">
+                Published: <strong className="text-emerald-600">{publishedCount}</strong>
+              </span>
+              {draftCount > 0 && (
+                <span className="px-3 py-1 rounded-lg bg-card/80 border border-border text-amber-600 font-medium">
+                  Drafts: <strong>{draftCount}</strong>
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Content Area: Certificates Grid */}
         {loading ? (
           <div className="mt-12 flex flex-col items-center justify-center py-16 text-muted-foreground">
             <Loader2 className="animate-spin text-primary" size={28} />
-            <p className="mt-3 text-xs font-medium">Loading certificates from Firestore...</p>
+            <p className="mt-3 text-xs font-medium">Loading verified certificates...</p>
           </div>
         ) : displayedCerts.length === 0 ? (
           <div className="mt-10 rounded-2xl border border-dashed border-border/80 bg-secondary/30 p-12 text-center backdrop-blur-sm">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/15 text-primary shadow-[0_0_20px_rgba(168,85,247,0.3)]">
               <Award size={28} />
             </div>
-            <h3 className="mt-4 font-display text-2xl font-medium">No certificates uploaded yet</h3>
+            <h3 className="mt-4 font-display text-2xl font-medium">No certificates published yet</h3>
             <p className="mx-auto mt-2 max-w-md text-xs text-muted-foreground">
-              Click the "Upload Certificate" button above to add your verified technical certificates. Everyone visiting will be able to view and download them!
+              {isAdmin 
+                ? "Click 'Upload Certificate' above to add your verified technical credentials and certificates."
+                : "Verified certifications, course achievements, and academic credentials will appear here once published by Tharshini."}
             </p>
-            <Button onClick={openNewModal} variant="portfolio" size="sm" className="mt-6 gap-2 cursor-pointer neon-glow-btn">
-              <Plus size={15} /> Upload First Certificate
-            </Button>
+            {isAdmin && (
+              <Button onClick={openNewModal} variant="portfolio" size="sm" className="mt-6 gap-2 cursor-pointer neon-glow-btn">
+                <Plus size={15} /> Upload First Certificate
+              </Button>
+            )}
           </div>
         ) : (
           <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -307,43 +412,53 @@ export function CertificatesSection({
               <TiltCard key={cert.id} className="rounded-2xl">
                 <div className="group relative flex flex-col justify-between rounded-2xl border border-border bg-card p-6 shadow-xs transition-all duration-300 hover:border-primary/50 hover:shadow-lg h-full">
                   <div>
-                    {/* Top Badge & Management Controls */}
+                    {/* Top Row: File type & Admin Controls */}
                     <div className="flex items-center justify-between gap-2">
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-[11px] font-semibold text-primary">
                         {cert.fileType === "pdf" ? <FileText size={13} /> : <ImageIcon size={13} />}
                         {cert.fileType.toUpperCase()}
                       </span>
 
-                      <div className="flex items-center gap-1">
-                        {currentUser && (
-                          <span className={`text-[10px] rounded-full px-2 py-0.5 font-semibold ${
-                            cert.published ? 'bg-emerald-500/10 text-emerald-600' : 'bg-amber-500/10 text-amber-600'
-                          }`}>
+                      {/* Admin-only controls */}
+                      {isAdmin ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleTogglePublish(cert)}
+                            className={`text-[10px] rounded-full px-2.5 py-0.5 font-semibold cursor-pointer border transition-colors ${
+                              cert.published 
+                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 hover:bg-emerald-500/20' 
+                                : 'bg-amber-500/10 border-amber-500/20 text-amber-600 hover:bg-amber-500/20'
+                            }`}
+                            title="Click to toggle Published/Draft"
+                          >
                             {cert.published ? 'Published' : 'Draft'}
-                          </span>
-                        )}
-                        <button 
-                          onClick={() => openEditModal(cert)}
-                          className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-primary transition-all cursor-pointer"
-                          title="Edit certificate details"
-                        >
-                          <Edit3 size={14} />
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(cert)}
-                          className="rounded-full p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all cursor-pointer"
-                          title="Delete certificate"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => openEditModal(cert)}
+                            className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-primary transition-all cursor-pointer"
+                            title="Edit certificate details"
+                          >
+                            <Edit3 size={14} />
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => setDeleteConfirmCert(cert)}
+                            className="rounded-full p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all cursor-pointer"
+                            title="Delete certificate"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
 
                     {/* Thumbnail / Preview Box */}
                     <div 
                       onClick={() => setPreviewCert(cert)}
                       className="mt-4 flex h-40 w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-border bg-secondary/40 transition-colors group-hover:bg-secondary/70 relative"
-                      title="Click to preview certificate"
+                      title="Click to view full certificate"
                     >
                       {cert.fileType === "image" ? (
                         <img 
@@ -355,12 +470,12 @@ export function CertificatesSection({
                       ) : (
                         <div className="flex flex-col items-center gap-2 text-muted-foreground group-hover:text-primary transition-colors">
                           <Award size={38} className="text-primary" />
-                          <span className="text-[11px] font-medium">Click to Preview PDF</span>
+                          <span className="text-[11px] font-medium">Click to Preview PDF Document</span>
                         </div>
                       )}
                       <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <span className="rounded-full bg-card/95 px-3 py-1 text-[11px] font-semibold text-primary shadow-xs flex items-center gap-1.5">
-                          <Eye size={13} /> Click to View
+                          <Eye size={13} /> View Full
                         </span>
                       </div>
                     </div>
@@ -388,7 +503,7 @@ export function CertificatesSection({
                     )}
                   </div>
 
-                  {/* Bottom Actions for public */}
+                  {/* Public Viewer Actions */}
                   <div className="mt-6 flex items-center gap-2 pt-4 border-t border-border">
                     <Button 
                       variant="portfolio" 
@@ -420,19 +535,34 @@ export function CertificatesSection({
           </div>
         )}
 
-        {/* Certificate Preview Modal */}
+        {/* Certificate Preview Modal (Accessible by everyone) */}
         {previewCert && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-            <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col rounded-2xl border border-border bg-card p-6 shadow-2xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
+            <div className="relative flex max-h-[92vh] w-full max-w-4xl flex-col rounded-2xl border border-border bg-card p-6 shadow-2xl">
               <div className="flex items-center justify-between border-b border-border pb-4">
                 <div>
                   <h3 className="font-display text-2xl font-medium">{previewCert.title}</h3>
-                  <p className="text-xs text-muted-foreground font-medium">Issued by {previewCert.issuer} · {previewCert.issueDate}</p>
+                  <p className="text-xs text-muted-foreground font-medium mt-0.5">
+                    Issued by {previewCert.issuer} · {previewCert.issueDate}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" asChild className="gap-1.5 text-xs">
                     <a href={previewCert.fileURL || previewCert.fileUrl} target="_blank" rel="noreferrer">
-                      <ExternalLink size={13} /> Open in New Tab
+                      <ExternalLink size={13} /> Open Original
+                    </a>
+                  </Button>
+                  <Button 
+                    variant="portfolio" 
+                    size="sm" 
+                    asChild 
+                    className="gap-1.5 text-xs neon-glow-btn"
+                  >
+                    <a 
+                      href={previewCert.fileURL || previewCert.fileUrl} 
+                      download={`${previewCert.title}.${previewCert.fileType}`}
+                    >
+                      <Download size={13} /> Download
                     </a>
                   </Button>
                   <Button variant="ghost" size="icon" onClick={() => setPreviewCert(null)} className="cursor-pointer">
@@ -441,14 +571,18 @@ export function CertificatesSection({
                 </div>
               </div>
 
-              <div className="mt-4 flex-1 overflow-auto rounded-xl border border-border bg-secondary/30 min-h-[350px] flex items-center justify-center p-2">
+              <div className="mt-4 flex-1 overflow-auto rounded-xl border border-border bg-secondary/30 min-h-[400px] flex items-center justify-center p-2">
                 {previewCert.fileType === "image" ? (
-                  <img src={previewCert.fileURL || previewCert.fileUrl} alt={previewCert.title} className="max-h-[70vh] w-auto object-contain mx-auto rounded-lg shadow-sm" />
+                  <img 
+                    src={previewCert.fileURL || previewCert.fileUrl} 
+                    alt={previewCert.title} 
+                    className="max-h-[72vh] w-auto object-contain mx-auto rounded-lg shadow-sm" 
+                  />
                 ) : (
                   <iframe 
                     src={previewCert.fileURL || previewCert.fileUrl} 
                     title={previewCert.title} 
-                    className="h-[70vh] w-full rounded-xl"
+                    className="h-[72vh] w-full rounded-xl"
                   />
                 )}
               </div>
@@ -456,14 +590,14 @@ export function CertificatesSection({
           </div>
         )}
 
-        {/* Admin Login Modal (Firebase Auth) */}
+        {/* Single-Admin Login Modal (Restricted to tharshnitharshni28@gmail.com) */}
         {showAdminLogin && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
             <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-7 shadow-2xl">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-primary font-semibold">
                   <Lock size={18} />
-                  <span>Admin Authentication</span>
+                  <span>Authorized Admin Portal</span>
                 </div>
                 <button 
                   onClick={() => setShowAdminLogin(false)} 
@@ -473,39 +607,52 @@ export function CertificatesSection({
                 </button>
               </div>
 
-              <p className="mt-2 text-xs text-muted-foreground">
-                Sign in with your Firebase administrator account to manage certificates and view private contact messages.
+              <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+                Single-administrator access restricted to the portfolio owner (<strong>{ADMIN_EMAIL}</strong>). Public registration is disabled.
               </p>
 
               {loginError && (
-                <div className="mt-4 rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive">
-                  {loginError}
+                <div className="mt-4 rounded-xl bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive flex items-start gap-2">
+                  <AlertCircle size={15} className="shrink-0 mt-0.5" />
+                  <span>{loginError}</span>
+                </div>
+              )}
+
+              {resetSentMessage && (
+                <div className="mt-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-600 flex items-start gap-2">
+                  <CheckCircle2 size={15} className="shrink-0 mt-0.5" />
+                  <span>{resetSentMessage}</span>
                 </div>
               )}
 
               <form onSubmit={handleAdminLogin} className="mt-5 space-y-3.5">
                 <div>
-                  <label className="block text-xs font-medium mb-1">Admin Email</label>
+                  <label className="block text-xs font-medium mb-1">Administrator Email</label>
                   <input
                     type="email"
                     required
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="admin@example.com"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    readOnly
+                    value={ADMIN_EMAIL}
+                    className="w-full rounded-lg border border-border bg-secondary/50 px-3 py-2 text-xs text-foreground cursor-not-allowed font-mono"
+                    title="Fixed authorized admin account"
                   />
+                  <span className="text-[10px] text-muted-foreground mt-0.5 block">
+                    Fixed single-admin identity
+                  </span>
                 </div>
+
                 <div>
-                  <label className="block text-xs font-medium mb-1">Password</label>
+                  <label className="block text-xs font-medium mb-1">Firebase Password</label>
                   <input
                     type="password"
                     required
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="••••••••"
+                    placeholder="Enter your Firebase admin password"
                     className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
+
                 <Button 
                   type="submit" 
                   disabled={loginLoading} 
@@ -514,14 +661,26 @@ export function CertificatesSection({
                 >
                   {loginLoading ? <Loader2 size={14} className="animate-spin" /> : "Sign In to Admin Portal"}
                 </Button>
+
+                {/* Password Setup / Reset Button */}
+                <div className="pt-3 border-t border-border/80 text-center">
+                  <button
+                    type="button"
+                    onClick={handlePasswordReset}
+                    disabled={resetLoading}
+                    className="text-[11px] text-primary hover:underline cursor-pointer inline-flex items-center gap-1 font-medium"
+                  >
+                    <KeyRound size={12} /> {resetLoading ? "Sending email..." : "First time or forgot password? Send reset link"}
+                  </button>
+                </div>
               </form>
             </div>
           </div>
         )}
 
-        {/* Upload / Edit Modal */}
-        {showUploadModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        {/* Upload / Edit Certificate Modal (Admin Only) */}
+        {showUploadModal && isAdmin && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
             <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-7 shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-border pb-4">
                 <div className="flex items-center gap-2 font-display text-2xl font-medium">
@@ -562,7 +721,7 @@ export function CertificatesSection({
                 )}
 
                 <div>
-                  <label className="block text-xs font-medium mb-1">Certificate Title</label>
+                  <label className="block text-xs font-medium mb-1">Certificate Title *</label>
                   <input
                     type="text"
                     required
@@ -575,7 +734,7 @@ export function CertificatesSection({
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-medium mb-1">Issuing Organization</label>
+                    <label className="block text-xs font-medium mb-1">Issuing Organization *</label>
                     <input
                       type="text"
                       required
@@ -586,7 +745,7 @@ export function CertificatesSection({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Issue Date</label>
+                    <label className="block text-xs font-medium mb-1">Issue Date *</label>
                     <input
                       type="date"
                       required
@@ -651,7 +810,7 @@ export function CertificatesSection({
                     className="cursor-pointer text-xs gap-1.5 neon-glow-btn"
                   >
                     {isSubmitting ? (
-                      <><Loader2 size={14} className="animate-spin" /> Uploading...</>
+                      <><Loader2 size={14} className="animate-spin" /> Saving...</>
                     ) : (
                       <><Check size={14} /> {editingCert ? "Update Certificate" : "Upload Certificate"}</>
                     )}
@@ -661,6 +820,130 @@ export function CertificatesSection({
             </div>
           </div>
         )}
+
+        {/* Manage Certificates Drawer / Modal (Admin Only) */}
+        {showManageDrawer && isAdmin && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
+            <div className="w-full max-w-3xl rounded-2xl border border-border bg-card p-6 shadow-2xl max-h-[90vh] flex flex-col">
+              <div className="flex items-center justify-between border-b border-border pb-4">
+                <div className="flex items-center gap-2">
+                  <SlidersHorizontal size={20} className="text-primary" />
+                  <h3 className="font-display text-2xl font-medium">Manage Certificates</h3>
+                  <span className="text-xs text-muted-foreground font-mono">({certificates.length} items)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button onClick={openNewModal} variant="portfolio" size="sm" className="text-xs gap-1 neon-glow-btn">
+                    <Plus size={14} /> Add New
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => setShowManageDrawer(false)} className="cursor-pointer">
+                    <X size={18} />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="mt-4 flex-1 overflow-y-auto">
+                {certificates.length === 0 ? (
+                  <p className="text-center py-12 text-xs text-muted-foreground">
+                    No certificates in database. Click "Add New" to upload your first certificate.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {certificates.map((cert) => (
+                      <div key={cert.id} className="py-3.5 flex flex-wrap items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold text-sm text-foreground truncate">{cert.title}</h4>
+                            <button
+                              type="button"
+                              onClick={() => handleTogglePublish(cert)}
+                              className={`text-[10px] rounded-full px-2 py-0.5 font-semibold cursor-pointer border ${
+                                cert.published 
+                                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' 
+                                  : 'bg-amber-500/10 border-amber-500/20 text-amber-600'
+                              }`}
+                            >
+                              {cert.published ? 'Published' : 'Draft'}
+                            </button>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {cert.issuer} · {cert.issueDate} · {cert.fileType.toUpperCase()}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => setPreviewCert(cert)} 
+                            className="text-xs gap-1 cursor-pointer"
+                          >
+                            <Eye size={12} /> Preview
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => {
+                              setShowManageDrawer(false);
+                              openEditModal(cert);
+                            }} 
+                            className="text-xs gap-1 cursor-pointer text-primary"
+                          >
+                            <Edit3 size={12} /> Edit
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => setDeleteConfirmCert(cert)} 
+                            className="text-xs gap-1 cursor-pointer text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 size={12} /> Delete
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal (Admin Only) */}
+        {deleteConfirmCert && isAdmin && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
+            <div className="w-full max-w-md rounded-2xl border border-destructive/30 bg-card p-6 shadow-2xl">
+              <div className="flex items-center gap-3 text-destructive">
+                <AlertCircle size={22} />
+                <h3 className="font-display text-xl font-semibold">Delete Certificate?</h3>
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
+                Are you sure you want to delete <strong>"{deleteConfirmCert.title}"</strong>? This will permanently remove the certificate record from Cloud Firestore and its file from Firebase Storage.
+              </p>
+              <div className="mt-6 flex items-center justify-end gap-3">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  disabled={isDeleting}
+                  onClick={() => setDeleteConfirmCert(null)}
+                  className="cursor-pointer text-xs"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  size="sm" 
+                  disabled={isDeleting}
+                  onClick={confirmDelete}
+                  className="cursor-pointer text-xs gap-1.5"
+                >
+                  {isDeleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                  <span>Confirm Delete</span>
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </section>
   );

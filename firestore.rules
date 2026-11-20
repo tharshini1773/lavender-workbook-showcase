@@ -1,17 +1,24 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Single authorized admin verification (tharshnitharshni28@gmail.com)
+    function isSingleAdmin() {
+      return request.auth != null && 
+             request.auth.token.email != null && 
+             request.auth.token.email.lower() == 'tharshnitharshni28@gmail.com';
+    }
+
     // Certificates collection:
     // Public visitors can only read published certificates
-    // Authenticated admin can read all, create, update, and delete
+    // Only the single authorized admin can view drafts, upload, edit, or delete
     match /certificates/{certificateId} {
-      allow read: if resource.data.published == true || request.auth != null;
-      allow write: if request.auth != null;
+      allow read: if resource.data.published == true || isSingleAdmin();
+      allow write: if isSingleAdmin();
     }
 
     // contactMessages collection:
-    // Public visitors can submit contact inquiries with validation
-    // Only authenticated admin can read, update, or delete private messages
+    // Public visitors can submit contact inquiries with field validation
+    // Only the single authorized admin can read, update, or delete messages
     match /contactMessages/{messageId} {
       allow create: if request.resource.data.name is string 
                     && request.resource.data.name.size() > 0
@@ -19,13 +26,13 @@ service cloud.firestore {
                     && request.resource.data.email.size() > 0
                     && request.resource.data.message is string 
                     && request.resource.data.message.size() > 0;
-      allow read, update, delete: if request.auth != null;
+      allow read, update, delete: if isSingleAdmin();
     }
 
     // Fallback messages collection
     match /messages/{messageId} {
       allow create: if true;
-      allow read, write: if request.auth != null;
+      allow read, write: if isSingleAdmin();
     }
   }
 }

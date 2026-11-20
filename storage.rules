@@ -1,11 +1,18 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // Single authorized admin verification (tharshnitharshni28@gmail.com)
+    function isSingleAdmin() {
+      return request.auth != null && 
+             request.auth.token.email != null && 
+             request.auth.token.email.lower() == 'tharshnitharshni28@gmail.com';
+    }
+
     match /certificates/{allPaths=**} {
       // Public visitors can view and download certificate files
       allow read: if true;
-      // Only authenticated admin can upload, overwrite, or delete
-      allow write: if request.auth != null;
+      // Only the single authorized admin can upload, update, or delete certificate files
+      allow write: if isSingleAdmin();
     }
   }
 }

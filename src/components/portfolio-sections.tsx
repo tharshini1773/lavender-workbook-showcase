@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowUpRight, GraduationCap, MapPin, Mail, Phone, Download, Github, Linkedin, Plus, Code2, Coffee, Braces, Leaf, Lightbulb, ArrowRight, Check, Copy, Sparkles } from "lucide-react";
+import { ArrowUpRight, GraduationCap, MapPin, Mail, Phone, Download, Github, Linkedin, Plus, Code2, Coffee, Braces, Leaf, Lightbulb, ArrowRight, Check, Copy, Sparkles, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { profile, project, skills, interests } from "@/lib/portfolio";
+import { sendContactMessage } from "@/lib/firebase";
 import projectImage from "@/assets/sweet-crumbs.png";
 import resume from "@/assets/tharshini-resume.pdf.asset.json";
 

@@ -97,7 +97,7 @@ export function ProjectsSection({ preview = false }: { preview?: boolean }) {
 }
 
 export function CareerSection() {
-  return <section className="section border-y border-border bg-secondary/40"><div className="page-width grid gap-8 md:grid-cols-[1fr_1.3fr]"><SectionHeading label="Career objective" title="Learning today. Building tomorrow." /><div className="md:pt-8"><p className="font-display text-2xl leading-relaxed">{profile.objective}</p><div className="mt-7 flex items-center gap-3 text-xs text-primary font-medium"><ArrowRight size={17} className="transition-transform group-hover:translate-x-1" />Aspiring Software Developer</div></div></div></section>;
+  return <section className="section"><div className="page-width grid gap-8 md:grid-cols-[1fr_1.3fr]"><SectionHeading label="Career objective" title="Learning today. Building tomorrow." /><div className="rounded-2xl border border-border bg-card p-8 shadow-xs md:p-10"><p className="font-display text-2xl leading-relaxed text-foreground">{profile.objective}</p><div className="mt-7 flex items-center gap-3 text-xs text-primary font-medium"><ArrowRight size={17} />Aspiring Software Developer</div></div></div></section>;
 }
 
 export function ContactSection({ preview = false }: { preview?: boolean }) {
